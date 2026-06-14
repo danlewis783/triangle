@@ -1,9 +1,8 @@
-# makefile for Triangle and Show Me
+# makefile for Triangle
 #
-# Type "make" to compile Triangle and Show Me.
+# Type "make" to compile Triangle.
 #
-# After compiling, type "triangle -h" and "showme -h" to read instructions
-#   for using each of these programs.
+# After compiling, type "triangle -h" to read instructions for using.
 #
 # Type "make trilibrary" to compile Triangle as an object file (triangle.o).
 #
@@ -27,7 +26,7 @@ CC = cc
 #   compiler, the -O2 switch generated a notably faster version of Triangle
 #   than the -O3 switch.  Go figure.
 #
-# By default, Triangle and Show Me use double precision floating point
+# By default, Triangle uses double precision floating point
 #   numbers.  If you prefer single precision, use the -DSINGLE switch.
 #   Double precision uses more memory, but improves the resolution of
 #   the meshes you can generate with Triangle.  It also reduces the
@@ -37,8 +36,7 @@ CC = cc
 #   not have enough memory to use double precision.
 #
 # If yours is not a Unix system, use the -DNO_TIMER switch to eliminate the
-#   Unix-specific timer code.  Also, don't try to compile Show Me; it only
-#   works with X Windows.
+#   Unix-specific timer code.
 #
 # To get the exact arithmetic to work right on an Intel processor, use the
 #   -DCPU86 switch with Microsoft C, or the -DLINUX switch with gcc running
@@ -63,17 +61,12 @@ CC = cc
 #   features; in this case, these switches should appear as part of
 #   "TRILIBDEFS" below.
 #
-# On some systems, you may need to include -I/usr/local/include and/or
-#   -L/usr/local/lib in the compiler options to ensure that the X include
-#   files and libraries that Show Me needs are found.  If you get errors
-#   like "Can't find include file X11/Xlib.h", you need the former switch.
-#   Try compiling without them first; add them if that fails.
 #
 # An example CSWITCHES line is:
 #
-#   CSWITCHES = -O -DNO_TIMER -DLINUX -I/usr/X11R6/include -L/usr/X11R6/lib
+#   CSWITCHES = -O -DNO_TIMER -DLINUX
 
-CSWITCHES = -O -DLINUX -I/usr/X11R6/include -L/usr/X11R6/lib
+CSWITCHES = -O
 
 # TRILIBDEFS is a list of definitions used to compile an object code version
 #   of Triangle (triangle.o) to be called by another program.  The file
@@ -94,7 +87,7 @@ RM = /bin/rm
 
 # The action starts here.
 
-all: $(BIN)triangle $(BIN)showme
+all: $(BIN)triangle
 
 trilibrary: $(BIN)triangle.o $(BIN)tricall
 
@@ -109,8 +102,5 @@ $(BIN)triangle.o: $(SRC)triangle.c $(SRC)triangle.h
 	$(CC) $(CSWITCHES) $(TRILIBDEFS) -c -o $(BIN)triangle.o \
 		$(SRC)triangle.c
 
-$(BIN)showme: $(SRC)showme.c
-	$(CC) $(CSWITCHES) -o $(BIN)showme $(SRC)showme.c -lX11
-
 distclean:
-	$(RM) $(BIN)triangle $(BIN)triangle.o $(BIN)tricall $(BIN)showme
+	$(RM) $(BIN)triangle $(BIN)triangle.o $(BIN)tricall
