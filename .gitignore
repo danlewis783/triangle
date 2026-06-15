@@ -5,6 +5,8 @@ tricall
 tricall.exe
 test/test_triangle
 test/test_triangle.exe
+test/golden_runner.exe
+test/.golden-actual/
 
 # Object files
 *.o

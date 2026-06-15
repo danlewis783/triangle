@@ -88,36 +88,59 @@ A quick test of the quality-meshing / refinement path:
 It should add Steiner points and report a larger mesh (≈76 vertices) with
 exit code 0.
 
-## Unit tests
+## Tests
 
-A small test suite lives under `test/`. It drives Triangle through its public
-`triangulate()` library API (the same entry point `tricall.c` uses) and
-asserts on the resulting mesh — triangle/vertex/edge counts, Euler's formula,
-and that area constraints force refinement. It uses the
-[Unity](https://github.com/ThrowTheSwitch/Unity) C test framework, vendored
-under `test/unity/`.
-
-Run it with the PowerShell runner:
+The suite under `test/` has two complementary layers, both driving Triangle
+through its public `triangulate()` library API (the same entry point
+`tricall.c` uses). Run everything with the PowerShell runner:
 
 ```powershell
 pwsh -File test\run-tests.ps1
 ```
 
-or, from a Unix-style shell (e.g. MSYS2), via the makefile:
+It compiles `triangle.c` (with `-DTRILIBRARY`) against the tests and exits
+non-zero if anything fails.
 
-```sh
-make test
+### Layer 1 — Unity unit tests
+
+`test/test_triangle.c` asserts human-readable invariants on small inputs:
+triangle/vertex/edge counts, Euler's formula, and that area constraints force
+refinement. It uses the [Unity](https://github.com/ThrowTheSwitch/Unity) C test
+framework, vendored under `test/unity/`. (A `make test` target runs just this
+layer from a Unix-style shell such as MSYS2.)
+
+To add a unit test: write a `void test_xxx(void)` in `test/test_triangle.c`,
+build a `struct triangulateio` input, call `triangulate(...)`, assert with
+Unity's `TEST_ASSERT_*` macros, then register it with `RUN_TEST(test_xxx);` in
+`main()`.
+
+### Layer 2 — Golden corpus (characterization)
+
+`test/golden_runner.c` runs a set of scenarios that exercise the **full feature
+set in use** — PSLG input with segment markers, constrained triangulation,
+quality meshing (`q`), regional area constraints (`a`) and region attributes
+(`A`), holes, and neighbour/segment/edge output — and writes a deterministic
+text dump of each output mesh. The baselines captured from a known-good build
+live in `test/golden/*.txt`.
+
+On each run the dumps are regenerated and compared **byte-for-byte** against the
+baseline. Because Triangle is deterministic for a given input and switch set,
+any difference — even one reordered triangle — fails the run. This is the
+tripwire that makes it safe to refactor or remove unused code: cut, re-run, and
+the corpus tells you immediately if the kept path changed.
+
+When you intentionally change output (e.g. after a deliberate algorithm change,
+**not** during dead-code removal), re-bless the baselines:
+
+```powershell
+pwsh -File test\run-tests.ps1 -Update
 ```
 
-Either way the suite compiles `triangle.c` (with `-DTRILIBRARY`) together with
-the tests and reports `PASS`/`FAIL` per test, exiting non-zero if any fail.
+Review the resulting `git diff` of `test/golden/` to confirm the change is what
+you expected before committing it.
 
-### Adding a test
-
-1. Write a `void test_xxx(void)` function in `test/test_triangle.c`, build a
-   `struct triangulateio` input, call `triangulate(...)`, and assert on the
-   output with Unity's `TEST_ASSERT_*` macros.
-2. Register it with a `RUN_TEST(test_xxx);` line in `main()`.
+To add a scenario: add a `scenario_xxx()` builder in `test/golden_runner.c`,
+call it from `main()`, then run with `-Update` to create its baseline.
 
 Note: Triangle aborts the whole process (via `exit()`) on a fatal input error
 rather than returning a code, so tests should feed it valid geometry; this is a
