@@ -1,0 +1,20 @@
+# Compiled executables
+triangle
+triangle.exe
+tricall
+tricall.exe
+
+# Object files
+*.o
+*.obj
+
+# Triangle-generated mesh files (e.g. A.1.node, A.1.ele, A.1.poly).
+# The iteration-number segment distinguishes them from inputs like A.poly.
+*.[0-9]*.node
+*.[0-9]*.ele
+*.[0-9]*.poly
+*.[0-9]*.edge
+*.[0-9]*.neigh
+*.[0-9]*.area
+*.[0-9]*.v.node
+*.[0-9]*.v.edge
