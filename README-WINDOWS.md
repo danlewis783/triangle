@@ -87,3 +87,38 @@ A quick test of the quality-meshing / refinement path:
 
 It should add Steiner points and report a larger mesh (≈76 vertices) with
 exit code 0.
+
+## Unit tests
+
+A small test suite lives under `test/`. It drives Triangle through its public
+`triangulate()` library API (the same entry point `tricall.c` uses) and
+asserts on the resulting mesh — triangle/vertex/edge counts, Euler's formula,
+and that area constraints force refinement. It uses the
+[Unity](https://github.com/ThrowTheSwitch/Unity) C test framework, vendored
+under `test/unity/`.
+
+Run it with the PowerShell runner:
+
+```powershell
+pwsh -File test\run-tests.ps1
+```
+
+or, from a Unix-style shell (e.g. MSYS2), via the makefile:
+
+```sh
+make test
+```
+
+Either way the suite compiles `triangle.c` (with `-DTRILIBRARY`) together with
+the tests and reports `PASS`/`FAIL` per test, exiting non-zero if any fail.
+
+### Adding a test
+
+1. Write a `void test_xxx(void)` function in `test/test_triangle.c`, build a
+   `struct triangulateio` input, call `triangulate(...)`, and assert on the
+   output with Unity's `TEST_ASSERT_*` macros.
+2. Register it with a `RUN_TEST(test_xxx);` line in `main()`.
+
+Note: Triangle aborts the whole process (via `exit()`) on a fatal input error
+rather than returning a code, so tests should feed it valid geometry; this is a
+limitation of testing a monolithic C program, not of the harness.

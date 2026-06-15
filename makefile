@@ -90,6 +90,9 @@ RM = /bin/rm
 
 # The action starts here.
 
+# `test' shares its name with the test/ directory, so mark targets phony.
+.PHONY: all trilibrary test distclean
+
 all: $(BIN)triangle
 
 trilibrary: $(BIN)triangle.o $(BIN)tricall
@@ -105,5 +108,14 @@ $(BIN)triangle.o: $(SRC)triangle.c $(SRC)triangle.h
 	$(CC) $(CSWITCHES) $(TRILIBDEFS) -c -o $(BIN)triangle.o \
 		$(SRC)triangle.c
 
+# Build and run the Unity test suite (see test/test_triangle.c).  This recipe
+# assumes a Unix-style shell; on a plain Windows/PowerShell prompt run
+# "pwsh -File test/run-tests.ps1" instead.
+test: $(SRC)triangle.c $(SRC)triangle.h test/test_triangle.c test/unity/unity.c
+	$(CC) $(CSWITCHES) -DTRILIBRARY -I. -Itest/unity \
+		-o test/test_triangle $(SRC)triangle.c \
+		test/unity/unity.c test/test_triangle.c -lm
+	./test/test_triangle
+
 distclean:
-	$(RM) $(BIN)triangle $(BIN)triangle.o $(BIN)tricall
+	$(RM) $(BIN)triangle $(BIN)triangle.o $(BIN)tricall test/test_triangle

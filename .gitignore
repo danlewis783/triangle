@@ -3,6 +3,8 @@ triangle
 triangle.exe
 tricall
 tricall.exe
+test/test_triangle
+test/test_triangle.exe
 
 # Object files
 *.o
