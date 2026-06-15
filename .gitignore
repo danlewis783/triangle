@@ -7,6 +7,7 @@ test/test_triangle
 test/test_triangle.exe
 test/golden_runner.exe
 test/.golden-actual/
+test/.coverage/
 
 # Object files
 *.o

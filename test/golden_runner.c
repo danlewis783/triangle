@@ -222,6 +222,75 @@ static void scenario_hole(void)
   run("hole", "pnzeQ", &in);
 }
 
+/* A rectangle enclosing a zig-zag point field, with an interior constraint    */
+/* segment (4->5) running horizontally through it.  The zig-zag points          */
+/* alternate above and below that line, so the constraint is NOT a Delaunay     */
+/* edge and must be recovered by flipping the crossed edges (exercises          */
+/* constrainededge / delaunayfixup).                                            */
+static void scenario_segment_recovery(void)
+{
+  static REAL points[22] = { 0,0,  8,0,  8,4,  0,4,     /* enclosing rectangle */
+                             1,2,  7,2,                  /* constraint endpoints */
+                             2,3,  3,1,  4,3,  5,1,  6,3 };  /* zig-zag interior */
+  static int  segs[10]   = { 0,1,  1,2,  2,3,  3,0,      /* boundary */
+                             4,5 };                       /* interior constraint */
+  static int  segmarks[5]= { 1, 1, 1, 1,  7 };
+  struct triangulateio in;
+
+  memset(&in, 0, sizeof(in));
+  in.numberofpoints = 11;
+  in.pointlist = points;
+  in.numberofsegments = 5;
+  in.segmentlist = segs;
+  in.segmentmarkerlist = segmarks;
+
+  run("segment_recovery", "pnzeQ", &in);
+}
+
+/* A square boundary with both diagonals as interior constraints.  The two      */
+/* diagonals physically cross at the centre - a point not present in the input  */
+/* - so Triangle must compute the intersection and insert a Steiner vertex      */
+/* there (exercises segmentintersection), yielding four triangles.              */
+static void scenario_segment_intersection(void)
+{
+  static REAL points[8]   = { 0,0,  4,0,  4,4,  0,4 };
+  static int  segs[12]    = { 0,1,  1,2,  2,3,  3,0,     /* boundary */
+                              0,2,  1,3 };                /* crossing diagonals */
+  static int  segmarks[6] = { 1, 1, 1, 1,  5, 6 };
+  struct triangulateio in;
+
+  memset(&in, 0, sizeof(in));
+  in.numberofpoints = 4;
+  in.pointlist = points;
+  in.numberofsegments = 6;
+  in.segmentlist = segs;
+  in.segmentmarkerlist = segmarks;
+
+  run("segment_intersection", "pnzeQ", &in);
+}
+
+/* A concave (L-shaped) domain.  Its boundary is not its convex hull, so        */
+/* Triangle meshes the hull and then carves away the triangles in the notch,    */
+/* deallocating the subsegments along the way (exercises the non-convex carving */
+/* path, including subsegdealloc).  Non-convex domains are the common case for   */
+/* real PSLG input, so this also makes the corpus more representative.          */
+static void scenario_concave_lshape(void)
+{
+  static REAL points[12] = { 0,0,  4,0,  4,2,  2,2,  2,4,  0,4 };
+  static int  segs[12]   = { 0,1,  1,2,  2,3,  3,4,  4,5,  5,0 };
+  static int  segmarks[6]= { 1, 1, 1, 1, 1, 1 };
+  struct triangulateio in;
+
+  memset(&in, 0, sizeof(in));
+  in.numberofpoints = 6;
+  in.pointlist = points;
+  in.numberofsegments = 6;
+  in.segmentlist = segs;
+  in.segmentmarkerlist = segmarks;
+
+  run("concave_lshape", "pnzeQ", &in);
+}
+
 int main(int argc, char **argv)
 {
   if (argc != 2) {
@@ -234,5 +303,8 @@ int main(int argc, char **argv)
   scenario_pslg_square();
   scenario_regions();
   scenario_hole();
+  scenario_segment_recovery();
+  scenario_segment_intersection();
+  scenario_concave_lshape();
   return 0;
 }
