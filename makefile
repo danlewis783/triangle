@@ -66,7 +66,10 @@ CC = cc
 #
 #   CSWITCHES = -O -DNO_TIMER -DLINUX
 
-CSWITCHES = -O
+# For a 64-bit Windows build with the LLVM-MinGW (clang) toolchain:
+#   -DCPU86    enables the correct x86 FPU control word for robust arithmetic
+#   -DNO_TIMER drops the Unix-only <sys/time.h> timing code
+CSWITCHES = -O -DCPU86 -DNO_TIMER
 
 # TRILIBDEFS is a list of definitions used to compile an object code version
 #   of Triangle (triangle.o) to be called by another program.  The file
