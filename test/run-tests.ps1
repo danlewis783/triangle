@@ -32,16 +32,22 @@ $cflags  = @('-O2', '-DTRILIBRARY', '-DCPU86', '-DNO_TIMER', '-I.', '-Itest\unit
 $failed  = $false
 
 function Invoke-Clang {
-    param([string[]]$Arguments)
+    param([string]$OutFile, [string[]]$Arguments)
+    # Remove any stale binary first, so a failed compile cannot fall through to
+    # running an old build and reporting a false pass.
+    if (Test-Path $OutFile) { Remove-Item $OutFile -Force }
     & $clang @Arguments
-    if ($LASTEXITCODE -ne 0) { Write-Error "Compilation failed ($LASTEXITCODE)." }
+    if (($LASTEXITCODE -ne 0) -or -not (Test-Path $OutFile)) {
+        Write-Host "Compilation failed ($LASTEXITCODE)." -ForegroundColor Red
+        exit 1
+    }
 }
 
 # --- 1. Unity unit tests -------------------------------------------------- #
 
 Write-Host '== Unit tests ==' -ForegroundColor Cyan
 $unitExe = 'test\test_triangle.exe'
-Invoke-Clang (@('-o', $unitExe, 'triangle.c', 'test\unity\unity.c',
+Invoke-Clang $unitExe (@('-o', $unitExe, 'triangle.c', 'test\unity\unity.c',
                 'test\test_triangle.c', '-lm') + $cflags)
 & ".\$unitExe"
 if ($LASTEXITCODE -ne 0) { $failed = $true }
@@ -51,7 +57,7 @@ if ($LASTEXITCODE -ne 0) { $failed = $true }
 Write-Host ''
 Write-Host '== Golden corpus ==' -ForegroundColor Cyan
 $goldenExe = 'test\golden_runner.exe'
-Invoke-Clang (@('-o', $goldenExe, 'triangle.c', 'test\golden_runner.c', '-lm') + $cflags)
+Invoke-Clang $goldenExe (@('-o', $goldenExe, 'triangle.c', 'test\golden_runner.c', '-lm') + $cflags)
 
 $goldenDir = 'test\golden'
 $actualDir = 'test\.golden-actual'
