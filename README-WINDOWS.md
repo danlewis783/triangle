@@ -132,6 +132,25 @@ you expected before committing it.
 To add a scenario: add a `scenario_xxx()` builder in `test/golden_runner.c`,
 call it from `main()`, then run with `-Update` to create its baseline.
 
+### Layer 3 — Predicate oracle (cross-language contract)
+
+`test/predicate_oracle.c` is a white-box harness — it `#include`s `triangle.c`
+directly to reach the internal robust predicates `counterclockwise` (orient2d)
+and `incircle` — and records the **exact sign** of each over a battery of
+inputs, including many near-degenerate cases where naive `double` arithmetic
+would get the sign wrong. The baseline is `test/golden/predicates.txt`, with
+lines of the form `orient2d <coords...> <sign>` and `incircle <coords...>
+<sign>` (sign ∈ {-1, 0, 1}).
+
+Only the **sign** is recorded, not the magnitude: the sign is the invariant the
+mesh algorithm depends on, and a re-derived predicate (e.g. FMA- or
+BigInteger-based) may legitimately return a different value but must agree on
+sign. All inputs are exact, explicit constants written at full precision, so a
+port can read the same coordinates and assert the same signs — this file is the
+contract a Java (or other) reimplementation of the predicates must satisfy
+before any meshing code is trusted. It is compared and re-blessed by
+`run-tests.ps1` exactly like the corpus baselines.
+
 Note: Triangle aborts the whole process (via `exit()`) on a fatal input error
 rather than returning a code, so tests should feed it valid geometry; this is a
 limitation of testing a monolithic C program, not of the harness.

@@ -6,6 +6,7 @@ tricall.exe
 test/test_triangle
 test/test_triangle.exe
 test/golden_runner.exe
+test/predicate_oracle.exe
 test/.golden-actual/
 test/.coverage/
 

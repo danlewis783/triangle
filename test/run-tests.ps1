@@ -7,10 +7,14 @@
 # Exits non-zero if compilation, a unit test, or a golden comparison fails,
 # so it is CI-friendly.
 #
-# Two layers of testing:
-#   * Unity unit tests (test_triangle.c) - human-readable invariants.
-#   * Golden corpus (golden_runner.c)    - byte-for-byte characterization of
+# Three layers of testing:
+#   * Unity unit tests (test_triangle.c)    - human-readable invariants.
+#   * Golden corpus (golden_runner.c)       - byte-for-byte characterization of
 #     the kept feature set; the tripwire for refactoring / code removal.
+#   * Predicate oracle (predicate_oracle.c) - exact SIGN of the robust
+#     geometric predicates over near-degenerate inputs; the cross-language
+#     contract for a future port. Its predicates.txt is compared like the
+#     corpus baselines.
 
 [CmdletBinding()]
 param([switch]$Update)
@@ -66,6 +70,14 @@ New-Item -ItemType Directory -Force $actualDir | Out-Null
 
 & ".\$goldenExe" $actualDir | Out-Null
 if ($LASTEXITCODE -ne 0) { Write-Error "golden_runner failed ($LASTEXITCODE)." }
+
+# Predicate oracle: a white-box harness that #includes triangle.c to reach the
+# internal predicates. It writes predicates.txt into the same actual dir, so
+# the comparison/bless loop below treats it like any other baseline.
+$predExe = 'test\predicate_oracle.exe'
+Invoke-Clang $predExe (@('-o', $predExe, 'test\predicate_oracle.c', '-lm') + $cflags)
+& ".\$predExe" $actualDir | Out-Null
+if ($LASTEXITCODE -ne 0) { Write-Error "predicate_oracle failed ($LASTEXITCODE)." }
 
 function Get-Normalized {
     param([string]$Path)
