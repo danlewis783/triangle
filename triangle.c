@@ -695,7 +695,7 @@ struct mesh {
 struct behavior {
 
 /* Switches for the triangulator.                                            */
-/*   poly: -p switch.  refine: -r switch.                                    */
+/*   poly: -p switch.                                                        */
 /*   quality: -q switch.                                                     */
 /*     minangle: minimum angle bound, specified after -q switch.             */
 /*     goodangle: cosine squared of minangle.                                */
@@ -724,7 +724,7 @@ struct behavior {
 /*                                                                           */
 /* Read the instructions to find out the meaning of these switches.          */
 
-  int poly, refine, quality, vararea, fixedarea, usertest;
+  int poly, quality, vararea, fixedarea, usertest;
   int regionattrib, convex, jettison;
   int firstnumber;
   int edgesout, voronoi, neighbors, geomview;
@@ -743,9 +743,7 @@ struct behavior {
 
 #ifndef TRILIBRARY
   char innodefilename[FILENAMESIZE];
-  char inelefilename[FILENAMESIZE];
   char inpolyfilename[FILENAMESIZE];
-  char areafilename[FILENAMESIZE];
   char outnodefilename[FILENAMESIZE];
   char outelefilename[FILENAMESIZE];
   char outpolyfilename[FILENAMESIZE];
@@ -1425,7 +1423,6 @@ void syntax()
 
   printf("    -p  Triangulates a Planar Straight Line Graph (.poly file).\n");
 #ifndef CDT_ONLY
-  printf("    -r  Refines a previously generated mesh.\n");
   printf(
     "    -q  Quality mesh generation.  A minimum angle may be specified.\n");
   printf("    -a  Applies a maximum triangle area constraint.\n");
@@ -3221,7 +3218,7 @@ struct behavior *b;
   int i, j, k;
   char workstring[FILENAMESIZE];
 
-  b->poly = b->refine = b->quality = 0;
+  b->poly = b->quality = 0;
   b->vararea = b->fixedarea = b->usertest = 0;
   b->regionattrib = b->convex = b->jettison = 0;
   b->firstnumber = 1;
@@ -3249,9 +3246,6 @@ struct behavior *b;
           b->poly = 1;
 	}
 #ifndef CDT_ONLY
-        if (argv[i][j] == 'r') {
-          b->refine = 1;
-	}
         if (argv[i][j] == 'q') {
           b->quality = 1;
           if (((argv[i][j + 1] >= '0') && (argv[i][j + 1] <= '9')) ||
@@ -3397,19 +3391,9 @@ struct behavior *b;
     b->poly = 1;
   }
 #ifndef CDT_ONLY
-  if (!strcmp(&b->innodefilename[strlen(b->innodefilename) - 4], ".ele")) {
-    b->innodefilename[strlen(b->innodefilename) - 4] = '\0';
-    b->refine = 1;
-  }
-  if (!strcmp(&b->innodefilename[strlen(b->innodefilename) - 5], ".area")) {
-    b->innodefilename[strlen(b->innodefilename) - 5] = '\0';
-    b->refine = 1;
-    b->quality = 1;
-    b->vararea = 1;
-  }
 #endif /* not CDT_ONLY */
 #endif /* not TRILIBRARY */
-  b->usesegments = b->poly || b->refine || b->quality || b->convex;
+  b->usesegments = b->poly || b->quality || b->convex;
   b->goodangle = cos(b->minangle * PI / 180.0);
   if (b->goodangle == 1.0) {
     b->offconstant = 0.0;
@@ -3417,19 +3401,14 @@ struct behavior *b;
     b->offconstant = 0.475 * sqrt((1.0 + b->goodangle) / (1.0 - b->goodangle));
   }
   b->goodangle *= b->goodangle;
-  if (b->refine && b->noiterationnum) {
-    printf(
-      "Error:  You cannot use the -I switch when refining a triangulation.\n");
-    triexit(1);
-  }
   /* Be careful not to allocate space for element area constraints that */
   /*   will never be assigned any value (other than the default -1.0).  */
-  if (!b->refine && !b->poly) {
+  if (!b->poly) {
     b->vararea = 0;
   }
   /* Be careful not to add an extra attribute to each element unless the */
   /*   input supports it (PSLG in, but not refining a preexisting mesh). */
-  if (b->refine || !b->poly) {
+  if (!b->poly) {
     b->regionattrib = 0;
   }
   if (b->jettison && b->nonodewritten && !b->quiet) {
@@ -3440,8 +3419,6 @@ struct behavior *b;
 
 #ifndef TRILIBRARY
   strcpy(b->inpolyfilename, b->innodefilename);
-  strcpy(b->inelefilename, b->innodefilename);
-  strcpy(b->areafilename, b->innodefilename);
   increment = 0;
   strcpy(workstring, b->innodefilename);
   j = 1;
@@ -3518,8 +3495,6 @@ struct behavior *b;
   }
   strcat(b->innodefilename, ".node");
   strcat(b->inpolyfilename, ".poly");
-  strcat(b->inelefilename, ".ele");
-  strcat(b->areafilename, ".area");
 #endif /* not TRILIBRARY */
 }
 
@@ -9159,509 +9134,6 @@ struct behavior *b;
   }
 }
 
-/*****************************************************************************/
-/*                                                                           */
-/*  reconstruct()   Reconstruct a triangulation from its .ele (and possibly  */
-/*                  .poly) file.  Used when the -r switch is used.           */
-/*                                                                           */
-/*  Reads an .ele file and reconstructs the original mesh.  If the -p switch */
-/*  is used, this procedure will also read a .poly file and reconstruct the  */
-/*  subsegments of the original mesh.  If the -a switch is used, this        */
-/*  procedure will also read an .area file and set a maximum area constraint */
-/*  on each triangle.                                                        */
-/*                                                                           */
-/*  Vertices that are not corners of triangles, such as nodes on edges of    */
-/*  subparametric elements, are discarded.                                   */
-/*                                                                           */
-/*  This routine finds the adjacencies between triangles (and subsegments)   */
-/*  by forming one stack of triangles for each vertex.  Each triangle is on  */
-/*  three different stacks simultaneously.  Each triangle's subsegment       */
-/*  pointers are used to link the items in each stack.  This memory-saving   */
-/*  feature makes the code harder to read.  The most important thing to keep */
-/*  in mind is that each triangle is removed from a stack precisely when     */
-/*  the corresponding pointer is adjusted to refer to a subsegment rather    */
-/*  than the next triangle of the stack.                                     */
-/*                                                                           */
-/*****************************************************************************/
-
-#ifndef CDT_ONLY
-
-#ifdef TRILIBRARY
-
-#ifdef ANSI_DECLARATORS
-int reconstruct(struct mesh *m, struct behavior *b, int *trianglelist,
-                REAL *triangleattriblist, REAL *trianglearealist,
-                int elements, int corners, int attribs,
-                int *segmentlist,int *segmentmarkerlist, int numberofsegments)
-#else /* not ANSI_DECLARATORS */
-int reconstruct(m, b, trianglelist, triangleattriblist, trianglearealist,
-                elements, corners, attribs, segmentlist, segmentmarkerlist,
-                numberofsegments)
-struct mesh *m;
-struct behavior *b;
-int *trianglelist;
-REAL *triangleattriblist;
-REAL *trianglearealist;
-int elements;
-int corners;
-int attribs;
-int *segmentlist;
-int *segmentmarkerlist;
-int numberofsegments;
-#endif /* not ANSI_DECLARATORS */
-
-#else /* not TRILIBRARY */
-
-#ifdef ANSI_DECLARATORS
-long reconstruct(struct mesh *m, struct behavior *b, char *elefilename,
-                 char *areafilename, char *polyfilename, FILE *polyfile)
-#else /* not ANSI_DECLARATORS */
-long reconstruct(m, b, elefilename, areafilename, polyfilename, polyfile)
-struct mesh *m;
-struct behavior *b;
-char *elefilename;
-char *areafilename;
-char *polyfilename;
-FILE *polyfile;
-#endif /* not ANSI_DECLARATORS */
-
-#endif /* not TRILIBRARY */
-
-{
-#ifdef TRILIBRARY
-  int vertexindex;
-  int attribindex;
-#else /* not TRILIBRARY */
-  FILE *elefile;
-  FILE *areafile;
-  char inputline[INPUTLINESIZE];
-  char *stringptr;
-  int areaelements;
-#endif /* not TRILIBRARY */
-  struct otri triangleloop;
-  struct otri triangleleft;
-  struct otri checktri;
-  struct otri checkleft;
-  struct otri checkneighbor;
-  struct osub subsegloop;
-  triangle *vertexarray;
-  triangle *prevlink;
-  triangle nexttri;
-  vertex tdest, tapex;
-  vertex checkdest, checkapex;
-  vertex shorg;
-  vertex killvertex;
-  vertex segmentorg, segmentdest;
-  REAL area;
-  int corner[3];
-  int end[2];
-  int killvertexindex;
-  int incorners;
-  int segmentmarkers;
-  int boundmarker;
-  int aroundvertex;
-  long hullsize;
-  int notfound;
-  long elementnumber, segmentnumber;
-  int i, j;
-  triangle ptr;                         /* Temporary variable used by sym(). */
-
-#ifdef TRILIBRARY
-  m->inelements = elements;
-  incorners = corners;
-  if (incorners < 3) {
-    printf("Error:  Triangles must have at least 3 vertices.\n");
-    triexit(1);
-  }
-  m->eextras = attribs;
-#else /* not TRILIBRARY */
-  /* Read the triangles from an .ele file. */
-  if (!b->quiet) {
-    printf("Opening %s.\n", elefilename);
-  }
-  elefile = fopen(elefilename, "r");
-  if (elefile == (FILE *) NULL) {
-    printf("  Error:  Cannot access file %s.\n", elefilename);
-    triexit(1);
-  }
-  /* Read number of triangles, number of vertices per triangle, and */
-  /*   number of triangle attributes from .ele file.                */
-  stringptr = readline(inputline, elefile, elefilename);
-  m->inelements = (int) strtol(stringptr, &stringptr, 0);
-  stringptr = findfield(stringptr);
-  if (*stringptr == '\0') {
-    incorners = 3;
-  } else {
-    incorners = (int) strtol(stringptr, &stringptr, 0);
-    if (incorners < 3) {
-      printf("Error:  Triangles in %s must have at least 3 vertices.\n",
-             elefilename);
-      triexit(1);
-    }
-  }
-  stringptr = findfield(stringptr);
-  if (*stringptr == '\0') {
-    m->eextras = 0;
-  } else {
-    m->eextras = (int) strtol(stringptr, &stringptr, 0);
-  }
-#endif /* not TRILIBRARY */
-
-  initializetrisubpools(m, b);
-
-  /* Create the triangles. */
-  for (elementnumber = 1; elementnumber <= m->inelements; elementnumber++) {
-    maketriangle(m, b, &triangleloop);
-    /* Mark the triangle as living. */
-    triangleloop.tri[3] = (triangle) triangleloop.tri;
-  }
-
-  segmentmarkers = 0;
-  if (b->poly) {
-#ifdef TRILIBRARY
-    m->insegments = numberofsegments;
-    segmentmarkers = segmentmarkerlist != (int *) NULL;
-#else /* not TRILIBRARY */
-    /* Read number of segments and number of segment */
-    /*   boundary markers from .poly file.           */
-    stringptr = readline(inputline, polyfile, b->inpolyfilename);
-    m->insegments = (int) strtol(stringptr, &stringptr, 0);
-    stringptr = findfield(stringptr);
-    if (*stringptr != '\0') {
-      segmentmarkers = (int) strtol(stringptr, &stringptr, 0);
-    }
-#endif /* not TRILIBRARY */
-
-    /* Create the subsegments. */
-    for (segmentnumber = 1; segmentnumber <= m->insegments; segmentnumber++) {
-      makesubseg(m, &subsegloop);
-      /* Mark the subsegment as living. */
-      subsegloop.ss[2] = (subseg) subsegloop.ss;
-    }
-  }
-
-#ifdef TRILIBRARY
-  vertexindex = 0;
-  attribindex = 0;
-#else /* not TRILIBRARY */
-  if (b->vararea) {
-    /* Open an .area file, check for consistency with the .ele file. */
-    if (!b->quiet) {
-      printf("Opening %s.\n", areafilename);
-    }
-    areafile = fopen(areafilename, "r");
-    if (areafile == (FILE *) NULL) {
-      printf("  Error:  Cannot access file %s.\n", areafilename);
-      triexit(1);
-    }
-    stringptr = readline(inputline, areafile, areafilename);
-    areaelements = (int) strtol(stringptr, &stringptr, 0);
-    if (areaelements != m->inelements) {
-      printf("Error:  %s and %s disagree on number of triangles.\n",
-             elefilename, areafilename);
-      triexit(1);
-    }
-  }
-#endif /* not TRILIBRARY */
-
-  if (!b->quiet) {
-    printf("Reconstructing mesh.\n");
-  }
-  /* Allocate a temporary array that maps each vertex to some adjacent */
-  /*   triangle.  I took care to allocate all the permanent memory for */
-  /*   triangles and subsegments first.                                */
-  vertexarray = (triangle *) trimalloc(m->vertices.items *
-                                       (int) sizeof(triangle));
-  /* Each vertex is initially unrepresented. */
-  for (i = 0; i < m->vertices.items; i++) {
-    vertexarray[i] = (triangle) m->dummytri;
-  }
-
-  if (b->verbose) {
-    printf("  Assembling triangles.\n");
-  }
-  /* Read the triangles from the .ele file, and link */
-  /*   together those that share an edge.            */
-  traversalinit(&m->triangles);
-  triangleloop.tri = triangletraverse(m);
-  elementnumber = b->firstnumber;
-  while (triangleloop.tri != (triangle *) NULL) {
-#ifdef TRILIBRARY
-    /* Copy the triangle's three corners. */
-    for (j = 0; j < 3; j++) {
-      corner[j] = trianglelist[vertexindex++];
-      if ((corner[j] < b->firstnumber) ||
-          (corner[j] >= b->firstnumber + m->invertices)) {
-        printf("Error:  Triangle %ld has an invalid vertex index.\n",
-               elementnumber);
-        triexit(1);
-      }
-    }
-#else /* not TRILIBRARY */
-    /* Read triangle number and the triangle's three corners. */
-    stringptr = readline(inputline, elefile, elefilename);
-    for (j = 0; j < 3; j++) {
-      stringptr = findfield(stringptr);
-      if (*stringptr == '\0') {
-        printf("Error:  Triangle %ld is missing vertex %d in %s.\n",
-               elementnumber, j + 1, elefilename);
-        triexit(1);
-      } else {
-        corner[j] = (int) strtol(stringptr, &stringptr, 0);
-        if ((corner[j] < b->firstnumber) ||
-            (corner[j] >= b->firstnumber + m->invertices)) {
-          printf("Error:  Triangle %ld has an invalid vertex index.\n",
-                 elementnumber);
-          triexit(1);
-        }
-      }
-    }
-#endif /* not TRILIBRARY */
-
-    /* Find out about (and throw away) extra nodes. */
-    for (j = 3; j < incorners; j++) {
-#ifdef TRILIBRARY
-      killvertexindex = trianglelist[vertexindex++];
-#else /* not TRILIBRARY */
-      stringptr = findfield(stringptr);
-      if (*stringptr != '\0') {
-        killvertexindex = (int) strtol(stringptr, &stringptr, 0);
-#endif /* not TRILIBRARY */
-        if ((killvertexindex >= b->firstnumber) &&
-            (killvertexindex < b->firstnumber + m->invertices)) {
-          /* Delete the non-corner vertex if it's not already deleted. */
-          killvertex = getvertex(m, b, killvertexindex);
-          if (vertextype(killvertex) != DEADVERTEX) {
-            vertexdealloc(m, killvertex);
-          }
-        }
-#ifndef TRILIBRARY
-      }
-#endif /* not TRILIBRARY */
-    }
-
-    /* Read the triangle's attributes. */
-    for (j = 0; j < m->eextras; j++) {
-#ifdef TRILIBRARY
-      setelemattribute(triangleloop, j, triangleattriblist[attribindex++]);
-#else /* not TRILIBRARY */
-      stringptr = findfield(stringptr);
-      if (*stringptr == '\0') {
-        setelemattribute(triangleloop, j, 0);
-      } else {
-        setelemattribute(triangleloop, j,
-                         (REAL) strtod(stringptr, &stringptr));
-      }
-#endif /* not TRILIBRARY */
-    }
-
-    if (b->vararea) {
-#ifdef TRILIBRARY
-      area = trianglearealist[elementnumber - b->firstnumber];
-#else /* not TRILIBRARY */
-      /* Read an area constraint from the .area file. */
-      stringptr = readline(inputline, areafile, areafilename);
-      stringptr = findfield(stringptr);
-      if (*stringptr == '\0') {
-        area = -1.0;                      /* No constraint on this triangle. */
-      } else {
-        area = (REAL) strtod(stringptr, &stringptr);
-      }
-#endif /* not TRILIBRARY */
-      setareabound(triangleloop, area);
-    }
-
-    /* Set the triangle's vertices. */
-    triangleloop.orient = 0;
-    setorg(triangleloop, getvertex(m, b, corner[0]));
-    setdest(triangleloop, getvertex(m, b, corner[1]));
-    setapex(triangleloop, getvertex(m, b, corner[2]));
-    /* Try linking the triangle to others that share these vertices. */
-    for (triangleloop.orient = 0; triangleloop.orient < 3;
-         triangleloop.orient++) {
-      /* Take the number for the origin of triangleloop. */
-      aroundvertex = corner[triangleloop.orient];
-      /* Look for other triangles having this vertex. */
-      nexttri = vertexarray[aroundvertex - b->firstnumber];
-      /* Link the current triangle to the next one in the stack. */
-      triangleloop.tri[6 + triangleloop.orient] = nexttri;
-      /* Push the current triangle onto the stack. */
-      vertexarray[aroundvertex - b->firstnumber] = encode(triangleloop);
-      decode(nexttri, checktri);
-      if (checktri.tri != m->dummytri) {
-        dest(triangleloop, tdest);
-        apex(triangleloop, tapex);
-        /* Look for other triangles that share an edge. */
-        do {
-          dest(checktri, checkdest);
-          apex(checktri, checkapex);
-          if (tapex == checkdest) {
-            /* The two triangles share an edge; bond them together. */
-            lprev(triangleloop, triangleleft);
-            bond(triangleleft, checktri);
-          }
-          if (tdest == checkapex) {
-            /* The two triangles share an edge; bond them together. */
-            lprev(checktri, checkleft);
-            bond(triangleloop, checkleft);
-          }
-          /* Find the next triangle in the stack. */
-          nexttri = checktri.tri[6 + checktri.orient];
-          decode(nexttri, checktri);
-        } while (checktri.tri != m->dummytri);
-      }
-    }
-    triangleloop.tri = triangletraverse(m);
-    elementnumber++;
-  }
-
-#ifdef TRILIBRARY
-  vertexindex = 0;
-#else /* not TRILIBRARY */
-  fclose(elefile);
-  if (b->vararea) {
-    fclose(areafile);
-  }
-#endif /* not TRILIBRARY */
-
-  hullsize = 0;                      /* Prepare to count the boundary edges. */
-  if (b->poly) {
-    if (b->verbose) {
-      printf("  Marking segments in triangulation.\n");
-    }
-    /* Read the segments from the .poly file, and link them */
-    /*   to their neighboring triangles.                    */
-    boundmarker = 0;
-    traversalinit(&m->subsegs);
-    subsegloop.ss = subsegtraverse(m);
-    segmentnumber = b->firstnumber;
-    while (subsegloop.ss != (subseg *) NULL) {
-#ifdef TRILIBRARY
-      end[0] = segmentlist[vertexindex++];
-      end[1] = segmentlist[vertexindex++];
-      if (segmentmarkers) {
-        boundmarker = segmentmarkerlist[segmentnumber - b->firstnumber];
-      }
-#else /* not TRILIBRARY */
-      /* Read the endpoints of each segment, and possibly a boundary marker. */
-      stringptr = readline(inputline, polyfile, b->inpolyfilename);
-      /* Skip the first (segment number) field. */
-      stringptr = findfield(stringptr);
-      if (*stringptr == '\0') {
-        printf("Error:  Segment %ld has no endpoints in %s.\n", segmentnumber,
-               polyfilename);
-        triexit(1);
-      } else {
-        end[0] = (int) strtol(stringptr, &stringptr, 0);
-      }
-      stringptr = findfield(stringptr);
-      if (*stringptr == '\0') {
-        printf("Error:  Segment %ld is missing its second endpoint in %s.\n",
-               segmentnumber, polyfilename);
-        triexit(1);
-      } else {
-        end[1] = (int) strtol(stringptr, &stringptr, 0);
-      }
-      if (segmentmarkers) {
-        stringptr = findfield(stringptr);
-        if (*stringptr == '\0') {
-          boundmarker = 0;
-        } else {
-          boundmarker = (int) strtol(stringptr, &stringptr, 0);
-        }
-      }
-#endif /* not TRILIBRARY */
-      for (j = 0; j < 2; j++) {
-        if ((end[j] < b->firstnumber) ||
-            (end[j] >= b->firstnumber + m->invertices)) {
-          printf("Error:  Segment %ld has an invalid vertex index.\n", 
-                 segmentnumber);
-          triexit(1);
-        }
-      }
-
-      /* set the subsegment's vertices. */
-      subsegloop.ssorient = 0;
-      segmentorg = getvertex(m, b, end[0]);
-      segmentdest = getvertex(m, b, end[1]);
-      setsorg(subsegloop, segmentorg);
-      setsdest(subsegloop, segmentdest);
-      setsegorg(subsegloop, segmentorg);
-      setsegdest(subsegloop, segmentdest);
-      setmark(subsegloop, boundmarker);
-      /* Try linking the subsegment to triangles that share these vertices. */
-      for (subsegloop.ssorient = 0; subsegloop.ssorient < 2;
-           subsegloop.ssorient++) {
-        /* Take the number for the destination of subsegloop. */
-        aroundvertex = end[1 - subsegloop.ssorient];
-        /* Look for triangles having this vertex. */
-        prevlink = &vertexarray[aroundvertex - b->firstnumber];
-        nexttri = vertexarray[aroundvertex - b->firstnumber];
-        decode(nexttri, checktri);
-        sorg(subsegloop, shorg);
-        notfound = 1;
-        /* Look for triangles having this edge.  Note that I'm only       */
-        /*   comparing each triangle's destination with the subsegment;   */
-        /*   each triangle's apex is handled through a different vertex.  */
-        /*   Because each triangle appears on three vertices' lists, each */
-        /*   occurrence of a triangle on a list can (and does) represent  */
-        /*   an edge.  In this way, most edges are represented twice, and */
-        /*   every triangle-subsegment bond is represented once.          */
-        while (notfound && (checktri.tri != m->dummytri)) {
-          dest(checktri, checkdest);
-          if (shorg == checkdest) {
-            /* We have a match.  Remove this triangle from the list. */
-            *prevlink = checktri.tri[6 + checktri.orient];
-            /* Bond the subsegment to the triangle. */
-            tsbond(checktri, subsegloop);
-            /* Check if this is a boundary edge. */
-            sym(checktri, checkneighbor);
-            if (checkneighbor.tri == m->dummytri) {
-              /* The next line doesn't insert a subsegment (because there's */
-              /*   already one there), but it sets the boundary markers of  */
-              /*   the existing subsegment and its vertices.                */
-              insertsubseg(m, b, &checktri, 1);
-              hullsize++;
-            }
-            notfound = 0;
-          }
-          /* Find the next triangle in the stack. */
-          prevlink = &checktri.tri[6 + checktri.orient];
-          nexttri = checktri.tri[6 + checktri.orient];
-          decode(nexttri, checktri);
-        }
-      }
-      subsegloop.ss = subsegtraverse(m);
-      segmentnumber++;
-    }
-  }
-
-  /* Mark the remaining edges as not being attached to any subsegment. */
-  /* Also, count the (yet uncounted) boundary edges.                   */
-  for (i = 0; i < m->vertices.items; i++) {
-    /* Search the stack of triangles adjacent to a vertex. */
-    nexttri = vertexarray[i];
-    decode(nexttri, checktri);
-    while (checktri.tri != m->dummytri) {
-      /* Find the next triangle in the stack before this */
-      /*   information gets overwritten.                 */
-      nexttri = checktri.tri[6 + checktri.orient];
-      /* No adjacent subsegment.  (This overwrites the stack info.) */
-      tsdissolve(checktri);
-      sym(checktri, checkneighbor);
-      if (checkneighbor.tri == m->dummytri) {
-        insertsubseg(m, b, &checktri, 1);
-        hullsize++;
-      }
-      decode(nexttri, checktri);
-    }
-  }
-
-  trifree((VOID *) vertexarray);
-  return hullsize;
-}
-
-#endif /* not CDT_ONLY */
 
 /**                                                                         **/
 /**                                                                         **/
@@ -11087,7 +10559,7 @@ int regions;
         printf("Spreading regional area constraints.\n");
       }
     }
-    if (b->regionattrib && !b->refine) {
+    if (b->regionattrib) {
       /* Assign every triangle a regional attribute of zero. */
       traversalinit(&m->triangles);
       triangleloop.orient = 0;
@@ -11112,7 +10584,7 @@ int regions;
         }
       }
     }
-    if (b->regionattrib && !b->refine) {
+    if (b->regionattrib) {
       /* Note the fact that each triangle has an additional attribute. */
       m->eextras++;
     }
@@ -12079,7 +11551,7 @@ int *regions;
   }
 
 #ifndef CDT_ONLY
-  if ((b->regionattrib || b->vararea) && !b->refine) {
+  if (b->regionattrib || b->vararea) {
     /* Read the area constraints. */
     stringptr = readline(inputline, polyfile, polyfilename);
     *regions = (int) strtol(stringptr, &stringptr, 0);
@@ -13033,35 +12505,12 @@ char **argv;
   }
 #endif /* not NO_TIMER */
 
-#ifdef CDT_ONLY
   m.hullsize = delaunay(&m, &b);                /* Triangulate the vertices. */
-#else /* not CDT_ONLY */
-  if (b.refine) {
-    /* Read and reconstruct a mesh. */
-#ifdef TRILIBRARY
-    m.hullsize = reconstruct(&m, &b, in->trianglelist,
-                             in->triangleattributelist, in->trianglearealist,
-                             in->numberoftriangles, in->numberofcorners,
-                             in->numberoftriangleattributes,
-                             in->segmentlist, in->segmentmarkerlist,
-                             in->numberofsegments);
-#else /* not TRILIBRARY */
-    m.hullsize = reconstruct(&m, &b, b.inelefilename, b.areafilename,
-                             b.inpolyfilename, polyfile);
-#endif /* not TRILIBRARY */
-  } else {
-    m.hullsize = delaunay(&m, &b);              /* Triangulate the vertices. */
-  }
-#endif /* not CDT_ONLY */
 
 #ifndef NO_TIMER
   if (!b.quiet) {
     gettimeofday(&tv2, &tz);
-    if (b.refine) {
-      printf("Mesh reconstruction");
-    } else {
-      printf("Delaunay");
-    }
+    printf("Delaunay");
     printf(" milliseconds:  %ld\n", 1000l * (tv2.tv_sec - tv1.tv_sec) +
            (tv2.tv_usec - tv1.tv_usec) / 1000l);
   }
@@ -13069,21 +12518,19 @@ char **argv;
 
   if (b.usesegments) {
     m.checksegments = 1;                /* Segments will be introduced next. */
-    if (!b.refine) {
-      /* Insert PSLG segments and/or convex hull segments. */
+    /* Insert PSLG segments and/or convex hull segments. */
 #ifdef TRILIBRARY
-      formskeleton(&m, &b, in->segmentlist,
-                   in->segmentmarkerlist, in->numberofsegments);
+    formskeleton(&m, &b, in->segmentlist,
+                 in->segmentmarkerlist, in->numberofsegments);
 #else /* not TRILIBRARY */
-      formskeleton(&m, &b, polyfile, b.inpolyfilename);
+    formskeleton(&m, &b, polyfile, b.inpolyfilename);
 #endif /* not TRILIBRARY */
-    }
   }
 
 #ifndef NO_TIMER
   if (!b.quiet) {
     gettimeofday(&tv3, &tz);
-    if (b.usesegments && !b.refine) {
+    if (b.usesegments) {
       printf("Segment milliseconds:  %ld\n",
              1000l * (tv3.tv_sec - tv2.tv_sec) +
              (tv3.tv_usec - tv2.tv_usec) / 1000l);
@@ -13101,10 +12548,8 @@ char **argv;
     readholes(&m, &b, polyfile, b.inpolyfilename, &holearray, &m.holes,
               &regionarray, &m.regions);
 #endif /* not TRILIBRARY */
-    if (!b.refine) {
-      /* Carve out holes and concavities. */
-      carveholes(&m, &b, holearray, m.holes, regionarray, m.regions);
-    }
+    /* Carve out holes and concavities. */
+    carveholes(&m, &b, holearray, m.holes, regionarray, m.regions);
   } else {
     /* Without a PSLG, there can be no holes or regional attributes   */
     /*   or area constraints.  The following are set to zero to avoid */
@@ -13116,7 +12561,7 @@ char **argv;
 #ifndef NO_TIMER
   if (!b.quiet) {
     gettimeofday(&tv4, &tz);
-    if (b.poly && !b.refine) {
+    if (b.poly) {
       printf("Hole milliseconds:  %ld\n", 1000l * (tv4.tv_sec - tv3.tv_sec) +
              (tv4.tv_usec - tv3.tv_usec) / 1000l);
     }
