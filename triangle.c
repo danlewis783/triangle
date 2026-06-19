@@ -658,7 +658,6 @@ struct mesh {
   int steinerleft;                 /* Number of Steiner points not yet used. */
   int vertexmarkindex;         /* Index to find boundary marker of a vertex. */
   int vertex2triindex;     /* Index to find a triangle adjacent to a vertex. */
-  int highorderindex;  /* Index to find extra nodes for high-order elements. */
   int elemattribindex;            /* Index to find attributes of a triangle. */
   int areaboundindex;             /* Index to find area bound of a triangle. */
   int checksegments;         /* Are there segments in the triangulation yet? */
@@ -668,7 +667,6 @@ struct mesh {
 
   long incirclecount;                 /* Number of incircle tests performed. */
   long counterclockcount;     /* Number of counterclockwise tests performed. */
-  long orient3dcount;           /* Number of 3D orientation tests performed. */
   long circumcentercount;  /* Number of circumcenter calculations performed. */
 
 /* Pointer to the `triangle' that occupies all of "outer space."             */
@@ -707,7 +705,7 @@ struct behavior {
 /*     maxarea: maximum area bound, specified after -a switch.               */
 /*   usertest: -u switch.                                                    */
 /*   regionattrib: -A switch.  convex: -c switch.                            */
-/*   weighted: 1 for -w switch, 2 for -W switch.  jettison: -j switch        */
+/*   jettison: -j switch.                                                    */
 /*   firstnumber: inverse of -z switch.  All items are numbered starting     */
 /*     from `firstnumber'.                                                   */
 /*   edgesout: -e switch.  voronoi: -v switch.                               */
@@ -716,12 +714,10 @@ struct behavior {
 /*   nonodewritten: -N switch.  noelewritten: -E switch.                     */
 /*   noiterationnum: -I switch.  noholes: -O switch.                         */
 /*   noexact: -X switch.                                                     */
-/*   order: element order, specified after -o switch.                        */
 /*   nobisect: count of how often -Y switch is selected.                     */
 /*   steiner: maximum number of Steiner points, specified after -S switch.   */
 /*   dwyer: inverse of -l switch.                                            */
-/*   splitseg: -s switch.                                                    */
-/*   conformdel: -D switch.  docheck: -C switch.                             */
+/*   docheck: -C switch.                                                     */
 /*   quiet: -Q switch.  verbose: count of how often -V switch is selected.   */
 /*   usesegments: -p, -r, -q, or -c switch; determines whether segments are  */
 /*     used at all.                                                          */
@@ -729,17 +725,15 @@ struct behavior {
 /* Read the instructions to find out the meaning of these switches.          */
 
   int poly, refine, quality, vararea, fixedarea, usertest;
-  int regionattrib, convex, weighted, jettison;
+  int regionattrib, convex, jettison;
   int firstnumber;
   int edgesout, voronoi, neighbors, geomview;
   int nobound, nopolywritten, nonodewritten, noelewritten, noiterationnum;
-  int noholes, noexact, conformdel;
+  int noholes, noexact;
   int dwyer;
-  int splitseg;
   int docheck;
   int quiet, verbose;
   int usesegments;
-  int order;
   int nobisect;
   int steiner;
   REAL minangle, goodangle, offconstant;
@@ -1441,12 +1435,7 @@ void syntax()
     "    -A  Applies attributes to identify triangles in certain regions.\n");
   printf("    -c  Encloses the convex hull with segments.\n");
 #ifndef CDT_ONLY
-  printf("    -D  Conforming Delaunay:  all triangles are truly Delaunay.\n");
 #endif /* not CDT_ONLY */
-/*
-  printf("    -w  Weighted Delaunay triangulation.\n");
-  printf("    -W  Regular triangulation (lower hull of a height field).\n");
-*/
   printf("    -j  Jettison unused vertices from output .node file.\n");
   printf("    -e  Generates an edge list.\n");
   printf("    -v  Generates a Voronoi diagram.\n");
@@ -1460,7 +1449,6 @@ void syntax()
   printf("    -O  Ignores holes in .poly file.\n");
   printf("    -X  Suppresses use of exact arithmetic.\n");
   printf("    -z  Numbers all items starting from zero (rather than one).\n");
-  printf("    -o2 Generates second-order subparametric elements.\n");
 #ifndef CDT_ONLY
   printf("    -Y  Suppresses boundary segment splitting.\n");
   printf("    -S  Specifies maximum number of added Steiner points.\n");
@@ -1468,8 +1456,6 @@ void syntax()
   printf("    -l  Uses vertical cuts only, rather than alternating cuts.\n");
 #ifndef REDUCED
 #ifndef CDT_ONLY
-  printf(
-    "    -s  Force segments into mesh by splitting (instead of using CDT).\n");
 #endif /* not CDT_ONLY */
   printf("    -C  Check consistency of final mesh.\n");
 #endif /* not REDUCED */
@@ -3237,19 +3223,16 @@ struct behavior *b;
 
   b->poly = b->refine = b->quality = 0;
   b->vararea = b->fixedarea = b->usertest = 0;
-  b->regionattrib = b->convex = b->weighted = b->jettison = 0;
+  b->regionattrib = b->convex = b->jettison = 0;
   b->firstnumber = 1;
   b->edgesout = b->voronoi = b->neighbors = b->geomview = 0;
   b->nobound = b->nopolywritten = b->nonodewritten = b->noelewritten = 0;
   b->noiterationnum = 0;
   b->noholes = b->noexact = 0;
   b->dwyer = 1;
-  b->splitseg = 0;
   b->docheck = 0;
   b->nobisect = 0;
-  b->conformdel = 0;
   b->steiner = -1;
-  b->order = 1;
   b->minangle = 0.0;
   b->maxarea = -1.0;
   b->quiet = b->verbose = 0;
@@ -3319,12 +3302,6 @@ struct behavior *b;
         if (argv[i][j] == 'c') {
           b->convex = 1;
         }
-        if (argv[i][j] == 'w') {
-          b->weighted = 1;
-        }
-        if (argv[i][j] == 'W') {
-          b->weighted = 2;
-        }
         if (argv[i][j] == 'j') {
           b->jettison = 1;
         }
@@ -3366,12 +3343,6 @@ struct behavior *b;
         if (argv[i][j] == 'X') {
           b->noexact = 1;
 	}
-        if (argv[i][j] == 'o') {
-          if (argv[i][j + 1] == '2') {
-            j++;
-            b->order = 2;
-          }
-	}
 #ifndef CDT_ONLY
         if (argv[i][j] == 'Y') {
           b->nobisect++;
@@ -3389,13 +3360,6 @@ struct behavior *b;
         }
 #ifndef REDUCED
 #ifndef CDT_ONLY
-        if (argv[i][j] == 's') {
-          b->splitseg = 1;
-        }
-        if ((argv[i][j] == 'D') || (argv[i][j] == 'L')) {
-          b->quality = 1;
-          b->conformdel = 1;
-        }
 #endif /* not CDT_ONLY */
         if (argv[i][j] == 'C') {
           b->docheck = 1;
@@ -3467,16 +3431,6 @@ struct behavior *b;
   /*   input supports it (PSLG in, but not refining a preexisting mesh). */
   if (b->refine || !b->poly) {
     b->regionattrib = 0;
-  }
-  /* Regular/weighted triangulations are incompatible with PSLGs */
-  /*   and meshing.                                              */
-  if (b->weighted && (b->poly || b->quality)) {
-    b->weighted = 0;
-    if (!b->quiet) {
-      printf("Warning:  weighted triangulations (-w, -W) are incompatible\n");
-      printf("  with PSLGs (-p) and meshing (-q, -a, -u).  Weights ignored.\n"
-             );
-    }
   }
   if (b->jettison && b->nonodewritten && !b->quiet) {
     printf("Warning:  -j and -N switches are somewhat incompatible.\n");
@@ -4230,8 +4184,8 @@ struct behavior *b;
 /*                            subsegment data structures and initialize      */
 /*                            their memory pools.                            */
 /*                                                                           */
-/*  This routine also computes the `highorderindex', `elemattribindex', and  */
-/*  `areaboundindex' indices used to find values within each triangle.       */
+/*  This routine also computes the `elemattribindex' and `areaboundindex'    */
+/*  indices used to find values within each triangle.                         */
 /*                                                                           */
 /*****************************************************************************/
 
@@ -4246,14 +4200,8 @@ struct behavior *b;
 {
   int trisize;
 
-  /* The index within each triangle at which the extra nodes (above three)  */
-  /*   associated with high order elements are found.  There are three      */
-  /*   pointers to other triangles, three pointers to corners, and possibly */
-  /*   three pointers to subsegments before the extra nodes.                */
-  m->highorderindex = 6 + (b->usesegments * 3);
   /* The number of bytes occupied by a triangle. */
-  trisize = ((b->order + 1) * (b->order + 2) / 2 + (m->highorderindex - 3)) *
-            sizeof(triangle);
+  trisize = (6 + b->usesegments * 3) * sizeof(triangle);
   /* The index within each triangle at which its attributes are found, */
   /*   where the index is measured in REALs.                           */
   m->elemattribindex = (trisize + sizeof(REAL) - 1) / sizeof(REAL);
@@ -5869,562 +5817,6 @@ vertex pd;
   return incircleadapt(pa, pb, pc, pd, permanent);
 }
 
-/*****************************************************************************/
-/*                                                                           */
-/*  orient3d()   Return a positive value if the point pd lies below the      */
-/*               plane passing through pa, pb, and pc; "below" is defined so */
-/*               that pa, pb, and pc appear in counterclockwise order when   */
-/*               viewed from above the plane.  Returns a negative value if   */
-/*               pd lies above the plane.  Returns zero if the points are    */
-/*               coplanar.  The result is also a rough approximation of six  */
-/*               times the signed volume of the tetrahedron defined by the   */
-/*               four points.                                                */
-/*                                                                           */
-/*  Uses exact arithmetic if necessary to ensure a correct answer.  The      */
-/*  result returned is the determinant of a matrix.  This determinant is     */
-/*  computed adaptively, in the sense that exact arithmetic is used only to  */
-/*  the degree it is needed to ensure that the returned value has the        */
-/*  correct sign.  Hence, this function is usually quite fast, but will run  */
-/*  more slowly when the input points are coplanar or nearly so.             */
-/*                                                                           */
-/*  See my Robust Predicates paper for details.                              */
-/*                                                                           */
-/*****************************************************************************/
-
-#ifdef ANSI_DECLARATORS
-REAL orient3dadapt(vertex pa, vertex pb, vertex pc, vertex pd,
-                   REAL aheight, REAL bheight, REAL cheight, REAL dheight,
-                   REAL permanent)
-#else /* not ANSI_DECLARATORS */
-REAL orient3dadapt(pa, pb, pc, pd,
-                   aheight, bheight, cheight, dheight, permanent)
-vertex pa;
-vertex pb;
-vertex pc;
-vertex pd;
-REAL aheight;
-REAL bheight;
-REAL cheight;
-REAL dheight;
-REAL permanent;
-#endif /* not ANSI_DECLARATORS */
-
-{
-  INEXACT REAL adx, bdx, cdx, ady, bdy, cdy, adheight, bdheight, cdheight;
-  REAL det, errbound;
-
-  INEXACT REAL bdxcdy1, cdxbdy1, cdxady1, adxcdy1, adxbdy1, bdxady1;
-  REAL bdxcdy0, cdxbdy0, cdxady0, adxcdy0, adxbdy0, bdxady0;
-  REAL bc[4], ca[4], ab[4];
-  INEXACT REAL bc3, ca3, ab3;
-  REAL adet[8], bdet[8], cdet[8];
-  int alen, blen, clen;
-  REAL abdet[16];
-  int ablen;
-  REAL *finnow, *finother, *finswap;
-  REAL fin1[192], fin2[192];
-  int finlength;
-
-  REAL adxtail, bdxtail, cdxtail;
-  REAL adytail, bdytail, cdytail;
-  REAL adheighttail, bdheighttail, cdheighttail;
-  INEXACT REAL at_blarge, at_clarge;
-  INEXACT REAL bt_clarge, bt_alarge;
-  INEXACT REAL ct_alarge, ct_blarge;
-  REAL at_b[4], at_c[4], bt_c[4], bt_a[4], ct_a[4], ct_b[4];
-  int at_blen, at_clen, bt_clen, bt_alen, ct_alen, ct_blen;
-  INEXACT REAL bdxt_cdy1, cdxt_bdy1, cdxt_ady1;
-  INEXACT REAL adxt_cdy1, adxt_bdy1, bdxt_ady1;
-  REAL bdxt_cdy0, cdxt_bdy0, cdxt_ady0;
-  REAL adxt_cdy0, adxt_bdy0, bdxt_ady0;
-  INEXACT REAL bdyt_cdx1, cdyt_bdx1, cdyt_adx1;
-  INEXACT REAL adyt_cdx1, adyt_bdx1, bdyt_adx1;
-  REAL bdyt_cdx0, cdyt_bdx0, cdyt_adx0;
-  REAL adyt_cdx0, adyt_bdx0, bdyt_adx0;
-  REAL bct[8], cat[8], abt[8];
-  int bctlen, catlen, abtlen;
-  INEXACT REAL bdxt_cdyt1, cdxt_bdyt1, cdxt_adyt1;
-  INEXACT REAL adxt_cdyt1, adxt_bdyt1, bdxt_adyt1;
-  REAL bdxt_cdyt0, cdxt_bdyt0, cdxt_adyt0;
-  REAL adxt_cdyt0, adxt_bdyt0, bdxt_adyt0;
-  REAL u[4], v[12], w[16];
-  INEXACT REAL u3;
-  int vlength, wlength;
-  REAL negate;
-
-  INEXACT REAL bvirt;
-  REAL avirt, bround, around;
-  INEXACT REAL c;
-  INEXACT REAL abig;
-  REAL ahi, alo, bhi, blo;
-  REAL err1, err2, err3;
-  INEXACT REAL _i, _j, _k;
-  REAL _0;
-
-  adx = (REAL) (pa[0] - pd[0]);
-  bdx = (REAL) (pb[0] - pd[0]);
-  cdx = (REAL) (pc[0] - pd[0]);
-  ady = (REAL) (pa[1] - pd[1]);
-  bdy = (REAL) (pb[1] - pd[1]);
-  cdy = (REAL) (pc[1] - pd[1]);
-  adheight = (REAL) (aheight - dheight);
-  bdheight = (REAL) (bheight - dheight);
-  cdheight = (REAL) (cheight - dheight);
-
-  Two_Product(bdx, cdy, bdxcdy1, bdxcdy0);
-  Two_Product(cdx, bdy, cdxbdy1, cdxbdy0);
-  Two_Two_Diff(bdxcdy1, bdxcdy0, cdxbdy1, cdxbdy0, bc3, bc[2], bc[1], bc[0]);
-  bc[3] = bc3;
-  alen = scale_expansion_zeroelim(4, bc, adheight, adet);
-
-  Two_Product(cdx, ady, cdxady1, cdxady0);
-  Two_Product(adx, cdy, adxcdy1, adxcdy0);
-  Two_Two_Diff(cdxady1, cdxady0, adxcdy1, adxcdy0, ca3, ca[2], ca[1], ca[0]);
-  ca[3] = ca3;
-  blen = scale_expansion_zeroelim(4, ca, bdheight, bdet);
-
-  Two_Product(adx, bdy, adxbdy1, adxbdy0);
-  Two_Product(bdx, ady, bdxady1, bdxady0);
-  Two_Two_Diff(adxbdy1, adxbdy0, bdxady1, bdxady0, ab3, ab[2], ab[1], ab[0]);
-  ab[3] = ab3;
-  clen = scale_expansion_zeroelim(4, ab, cdheight, cdet);
-
-  ablen = fast_expansion_sum_zeroelim(alen, adet, blen, bdet, abdet);
-  finlength = fast_expansion_sum_zeroelim(ablen, abdet, clen, cdet, fin1);
-
-  det = estimate(finlength, fin1);
-  errbound = o3derrboundB * permanent;
-  if ((det >= errbound) || (-det >= errbound)) {
-    return det;
-  }
-
-  Two_Diff_Tail(pa[0], pd[0], adx, adxtail);
-  Two_Diff_Tail(pb[0], pd[0], bdx, bdxtail);
-  Two_Diff_Tail(pc[0], pd[0], cdx, cdxtail);
-  Two_Diff_Tail(pa[1], pd[1], ady, adytail);
-  Two_Diff_Tail(pb[1], pd[1], bdy, bdytail);
-  Two_Diff_Tail(pc[1], pd[1], cdy, cdytail);
-  Two_Diff_Tail(aheight, dheight, adheight, adheighttail);
-  Two_Diff_Tail(bheight, dheight, bdheight, bdheighttail);
-  Two_Diff_Tail(cheight, dheight, cdheight, cdheighttail);
-
-  if ((adxtail == 0.0) && (bdxtail == 0.0) && (cdxtail == 0.0) &&
-      (adytail == 0.0) && (bdytail == 0.0) && (cdytail == 0.0) &&
-      (adheighttail == 0.0) &&
-      (bdheighttail == 0.0) &&
-      (cdheighttail == 0.0)) {
-    return det;
-  }
-
-  errbound = o3derrboundC * permanent + resulterrbound * Absolute(det);
-  det += (adheight * ((bdx * cdytail + cdy * bdxtail) -
-                      (bdy * cdxtail + cdx * bdytail)) +
-          adheighttail * (bdx * cdy - bdy * cdx)) +
-         (bdheight * ((cdx * adytail + ady * cdxtail) -
-                      (cdy * adxtail + adx * cdytail)) +
-          bdheighttail * (cdx * ady - cdy * adx)) +
-         (cdheight * ((adx * bdytail + bdy * adxtail) -
-                      (ady * bdxtail + bdx * adytail)) +
-          cdheighttail * (adx * bdy - ady * bdx));
-  if ((det >= errbound) || (-det >= errbound)) {
-    return det;
-  }
-
-  finnow = fin1;
-  finother = fin2;
-
-  if (adxtail == 0.0) {
-    if (adytail == 0.0) {
-      at_b[0] = 0.0;
-      at_blen = 1;
-      at_c[0] = 0.0;
-      at_clen = 1;
-    } else {
-      negate = -adytail;
-      Two_Product(negate, bdx, at_blarge, at_b[0]);
-      at_b[1] = at_blarge;
-      at_blen = 2;
-      Two_Product(adytail, cdx, at_clarge, at_c[0]);
-      at_c[1] = at_clarge;
-      at_clen = 2;
-    }
-  } else {
-    if (adytail == 0.0) {
-      Two_Product(adxtail, bdy, at_blarge, at_b[0]);
-      at_b[1] = at_blarge;
-      at_blen = 2;
-      negate = -adxtail;
-      Two_Product(negate, cdy, at_clarge, at_c[0]);
-      at_c[1] = at_clarge;
-      at_clen = 2;
-    } else {
-      Two_Product(adxtail, bdy, adxt_bdy1, adxt_bdy0);
-      Two_Product(adytail, bdx, adyt_bdx1, adyt_bdx0);
-      Two_Two_Diff(adxt_bdy1, adxt_bdy0, adyt_bdx1, adyt_bdx0,
-                   at_blarge, at_b[2], at_b[1], at_b[0]);
-      at_b[3] = at_blarge;
-      at_blen = 4;
-      Two_Product(adytail, cdx, adyt_cdx1, adyt_cdx0);
-      Two_Product(adxtail, cdy, adxt_cdy1, adxt_cdy0);
-      Two_Two_Diff(adyt_cdx1, adyt_cdx0, adxt_cdy1, adxt_cdy0,
-                   at_clarge, at_c[2], at_c[1], at_c[0]);
-      at_c[3] = at_clarge;
-      at_clen = 4;
-    }
-  }
-  if (bdxtail == 0.0) {
-    if (bdytail == 0.0) {
-      bt_c[0] = 0.0;
-      bt_clen = 1;
-      bt_a[0] = 0.0;
-      bt_alen = 1;
-    } else {
-      negate = -bdytail;
-      Two_Product(negate, cdx, bt_clarge, bt_c[0]);
-      bt_c[1] = bt_clarge;
-      bt_clen = 2;
-      Two_Product(bdytail, adx, bt_alarge, bt_a[0]);
-      bt_a[1] = bt_alarge;
-      bt_alen = 2;
-    }
-  } else {
-    if (bdytail == 0.0) {
-      Two_Product(bdxtail, cdy, bt_clarge, bt_c[0]);
-      bt_c[1] = bt_clarge;
-      bt_clen = 2;
-      negate = -bdxtail;
-      Two_Product(negate, ady, bt_alarge, bt_a[0]);
-      bt_a[1] = bt_alarge;
-      bt_alen = 2;
-    } else {
-      Two_Product(bdxtail, cdy, bdxt_cdy1, bdxt_cdy0);
-      Two_Product(bdytail, cdx, bdyt_cdx1, bdyt_cdx0);
-      Two_Two_Diff(bdxt_cdy1, bdxt_cdy0, bdyt_cdx1, bdyt_cdx0,
-                   bt_clarge, bt_c[2], bt_c[1], bt_c[0]);
-      bt_c[3] = bt_clarge;
-      bt_clen = 4;
-      Two_Product(bdytail, adx, bdyt_adx1, bdyt_adx0);
-      Two_Product(bdxtail, ady, bdxt_ady1, bdxt_ady0);
-      Two_Two_Diff(bdyt_adx1, bdyt_adx0, bdxt_ady1, bdxt_ady0,
-                  bt_alarge, bt_a[2], bt_a[1], bt_a[0]);
-      bt_a[3] = bt_alarge;
-      bt_alen = 4;
-    }
-  }
-  if (cdxtail == 0.0) {
-    if (cdytail == 0.0) {
-      ct_a[0] = 0.0;
-      ct_alen = 1;
-      ct_b[0] = 0.0;
-      ct_blen = 1;
-    } else {
-      negate = -cdytail;
-      Two_Product(negate, adx, ct_alarge, ct_a[0]);
-      ct_a[1] = ct_alarge;
-      ct_alen = 2;
-      Two_Product(cdytail, bdx, ct_blarge, ct_b[0]);
-      ct_b[1] = ct_blarge;
-      ct_blen = 2;
-    }
-  } else {
-    if (cdytail == 0.0) {
-      Two_Product(cdxtail, ady, ct_alarge, ct_a[0]);
-      ct_a[1] = ct_alarge;
-      ct_alen = 2;
-      negate = -cdxtail;
-      Two_Product(negate, bdy, ct_blarge, ct_b[0]);
-      ct_b[1] = ct_blarge;
-      ct_blen = 2;
-    } else {
-      Two_Product(cdxtail, ady, cdxt_ady1, cdxt_ady0);
-      Two_Product(cdytail, adx, cdyt_adx1, cdyt_adx0);
-      Two_Two_Diff(cdxt_ady1, cdxt_ady0, cdyt_adx1, cdyt_adx0,
-                   ct_alarge, ct_a[2], ct_a[1], ct_a[0]);
-      ct_a[3] = ct_alarge;
-      ct_alen = 4;
-      Two_Product(cdytail, bdx, cdyt_bdx1, cdyt_bdx0);
-      Two_Product(cdxtail, bdy, cdxt_bdy1, cdxt_bdy0);
-      Two_Two_Diff(cdyt_bdx1, cdyt_bdx0, cdxt_bdy1, cdxt_bdy0,
-                   ct_blarge, ct_b[2], ct_b[1], ct_b[0]);
-      ct_b[3] = ct_blarge;
-      ct_blen = 4;
-    }
-  }
-
-  bctlen = fast_expansion_sum_zeroelim(bt_clen, bt_c, ct_blen, ct_b, bct);
-  wlength = scale_expansion_zeroelim(bctlen, bct, adheight, w);
-  finlength = fast_expansion_sum_zeroelim(finlength, finnow, wlength, w,
-                                          finother);
-  finswap = finnow; finnow = finother; finother = finswap;
-
-  catlen = fast_expansion_sum_zeroelim(ct_alen, ct_a, at_clen, at_c, cat);
-  wlength = scale_expansion_zeroelim(catlen, cat, bdheight, w);
-  finlength = fast_expansion_sum_zeroelim(finlength, finnow, wlength, w,
-                                          finother);
-  finswap = finnow; finnow = finother; finother = finswap;
-
-  abtlen = fast_expansion_sum_zeroelim(at_blen, at_b, bt_alen, bt_a, abt);
-  wlength = scale_expansion_zeroelim(abtlen, abt, cdheight, w);
-  finlength = fast_expansion_sum_zeroelim(finlength, finnow, wlength, w,
-                                          finother);
-  finswap = finnow; finnow = finother; finother = finswap;
-
-  if (adheighttail != 0.0) {
-    vlength = scale_expansion_zeroelim(4, bc, adheighttail, v);
-    finlength = fast_expansion_sum_zeroelim(finlength, finnow, vlength, v,
-                                            finother);
-    finswap = finnow; finnow = finother; finother = finswap;
-  }
-  if (bdheighttail != 0.0) {
-    vlength = scale_expansion_zeroelim(4, ca, bdheighttail, v);
-    finlength = fast_expansion_sum_zeroelim(finlength, finnow, vlength, v,
-                                            finother);
-    finswap = finnow; finnow = finother; finother = finswap;
-  }
-  if (cdheighttail != 0.0) {
-    vlength = scale_expansion_zeroelim(4, ab, cdheighttail, v);
-    finlength = fast_expansion_sum_zeroelim(finlength, finnow, vlength, v,
-                                            finother);
-    finswap = finnow; finnow = finother; finother = finswap;
-  }
-
-  if (adxtail != 0.0) {
-    if (bdytail != 0.0) {
-      Two_Product(adxtail, bdytail, adxt_bdyt1, adxt_bdyt0);
-      Two_One_Product(adxt_bdyt1, adxt_bdyt0, cdheight, u3, u[2], u[1], u[0]);
-      u[3] = u3;
-      finlength = fast_expansion_sum_zeroelim(finlength, finnow, 4, u,
-                                              finother);
-      finswap = finnow; finnow = finother; finother = finswap;
-      if (cdheighttail != 0.0) {
-        Two_One_Product(adxt_bdyt1, adxt_bdyt0, cdheighttail,
-                        u3, u[2], u[1], u[0]);
-        u[3] = u3;
-        finlength = fast_expansion_sum_zeroelim(finlength, finnow, 4, u,
-                                                finother);
-        finswap = finnow; finnow = finother; finother = finswap;
-      }
-    }
-    if (cdytail != 0.0) {
-      negate = -adxtail;
-      Two_Product(negate, cdytail, adxt_cdyt1, adxt_cdyt0);
-      Two_One_Product(adxt_cdyt1, adxt_cdyt0, bdheight, u3, u[2], u[1], u[0]);
-      u[3] = u3;
-      finlength = fast_expansion_sum_zeroelim(finlength, finnow, 4, u,
-                                              finother);
-      finswap = finnow; finnow = finother; finother = finswap;
-      if (bdheighttail != 0.0) {
-        Two_One_Product(adxt_cdyt1, adxt_cdyt0, bdheighttail,
-                        u3, u[2], u[1], u[0]);
-        u[3] = u3;
-        finlength = fast_expansion_sum_zeroelim(finlength, finnow, 4, u,
-                                                finother);
-        finswap = finnow; finnow = finother; finother = finswap;
-      }
-    }
-  }
-  if (bdxtail != 0.0) {
-    if (cdytail != 0.0) {
-      Two_Product(bdxtail, cdytail, bdxt_cdyt1, bdxt_cdyt0);
-      Two_One_Product(bdxt_cdyt1, bdxt_cdyt0, adheight, u3, u[2], u[1], u[0]);
-      u[3] = u3;
-      finlength = fast_expansion_sum_zeroelim(finlength, finnow, 4, u,
-                                              finother);
-      finswap = finnow; finnow = finother; finother = finswap;
-      if (adheighttail != 0.0) {
-        Two_One_Product(bdxt_cdyt1, bdxt_cdyt0, adheighttail,
-                        u3, u[2], u[1], u[0]);
-        u[3] = u3;
-        finlength = fast_expansion_sum_zeroelim(finlength, finnow, 4, u,
-                                                finother);
-        finswap = finnow; finnow = finother; finother = finswap;
-      }
-    }
-    if (adytail != 0.0) {
-      negate = -bdxtail;
-      Two_Product(negate, adytail, bdxt_adyt1, bdxt_adyt0);
-      Two_One_Product(bdxt_adyt1, bdxt_adyt0, cdheight, u3, u[2], u[1], u[0]);
-      u[3] = u3;
-      finlength = fast_expansion_sum_zeroelim(finlength, finnow, 4, u,
-                                              finother);
-      finswap = finnow; finnow = finother; finother = finswap;
-      if (cdheighttail != 0.0) {
-        Two_One_Product(bdxt_adyt1, bdxt_adyt0, cdheighttail,
-                        u3, u[2], u[1], u[0]);
-        u[3] = u3;
-        finlength = fast_expansion_sum_zeroelim(finlength, finnow, 4, u,
-                                                finother);
-        finswap = finnow; finnow = finother; finother = finswap;
-      }
-    }
-  }
-  if (cdxtail != 0.0) {
-    if (adytail != 0.0) {
-      Two_Product(cdxtail, adytail, cdxt_adyt1, cdxt_adyt0);
-      Two_One_Product(cdxt_adyt1, cdxt_adyt0, bdheight, u3, u[2], u[1], u[0]);
-      u[3] = u3;
-      finlength = fast_expansion_sum_zeroelim(finlength, finnow, 4, u,
-                                              finother);
-      finswap = finnow; finnow = finother; finother = finswap;
-      if (bdheighttail != 0.0) {
-        Two_One_Product(cdxt_adyt1, cdxt_adyt0, bdheighttail,
-                        u3, u[2], u[1], u[0]);
-        u[3] = u3;
-        finlength = fast_expansion_sum_zeroelim(finlength, finnow, 4, u,
-                                                finother);
-        finswap = finnow; finnow = finother; finother = finswap;
-      }
-    }
-    if (bdytail != 0.0) {
-      negate = -cdxtail;
-      Two_Product(negate, bdytail, cdxt_bdyt1, cdxt_bdyt0);
-      Two_One_Product(cdxt_bdyt1, cdxt_bdyt0, adheight, u3, u[2], u[1], u[0]);
-      u[3] = u3;
-      finlength = fast_expansion_sum_zeroelim(finlength, finnow, 4, u,
-                                              finother);
-      finswap = finnow; finnow = finother; finother = finswap;
-      if (adheighttail != 0.0) {
-        Two_One_Product(cdxt_bdyt1, cdxt_bdyt0, adheighttail,
-                        u3, u[2], u[1], u[0]);
-        u[3] = u3;
-        finlength = fast_expansion_sum_zeroelim(finlength, finnow, 4, u,
-                                                finother);
-        finswap = finnow; finnow = finother; finother = finswap;
-      }
-    }
-  }
-
-  if (adheighttail != 0.0) {
-    wlength = scale_expansion_zeroelim(bctlen, bct, adheighttail, w);
-    finlength = fast_expansion_sum_zeroelim(finlength, finnow, wlength, w,
-                                            finother);
-    finswap = finnow; finnow = finother; finother = finswap;
-  }
-  if (bdheighttail != 0.0) {
-    wlength = scale_expansion_zeroelim(catlen, cat, bdheighttail, w);
-    finlength = fast_expansion_sum_zeroelim(finlength, finnow, wlength, w,
-                                            finother);
-    finswap = finnow; finnow = finother; finother = finswap;
-  }
-  if (cdheighttail != 0.0) {
-    wlength = scale_expansion_zeroelim(abtlen, abt, cdheighttail, w);
-    finlength = fast_expansion_sum_zeroelim(finlength, finnow, wlength, w,
-                                            finother);
-    finswap = finnow; finnow = finother; finother = finswap;
-  }
-
-  return finnow[finlength - 1];
-}
-
-#ifdef ANSI_DECLARATORS
-REAL orient3d(struct mesh *m, struct behavior *b,
-              vertex pa, vertex pb, vertex pc, vertex pd,
-              REAL aheight, REAL bheight, REAL cheight, REAL dheight)
-#else /* not ANSI_DECLARATORS */
-REAL orient3d(m, b, pa, pb, pc, pd, aheight, bheight, cheight, dheight)
-struct mesh *m;
-struct behavior *b;
-vertex pa;
-vertex pb;
-vertex pc;
-vertex pd;
-REAL aheight;
-REAL bheight;
-REAL cheight;
-REAL dheight;
-#endif /* not ANSI_DECLARATORS */
-
-{
-  REAL adx, bdx, cdx, ady, bdy, cdy, adheight, bdheight, cdheight;
-  REAL bdxcdy, cdxbdy, cdxady, adxcdy, adxbdy, bdxady;
-  REAL det;
-  REAL permanent, errbound;
-
-  m->orient3dcount++;
-
-  adx = pa[0] - pd[0];
-  bdx = pb[0] - pd[0];
-  cdx = pc[0] - pd[0];
-  ady = pa[1] - pd[1];
-  bdy = pb[1] - pd[1];
-  cdy = pc[1] - pd[1];
-  adheight = aheight - dheight;
-  bdheight = bheight - dheight;
-  cdheight = cheight - dheight;
-
-  bdxcdy = bdx * cdy;
-  cdxbdy = cdx * bdy;
-
-  cdxady = cdx * ady;
-  adxcdy = adx * cdy;
-
-  adxbdy = adx * bdy;
-  bdxady = bdx * ady;
-
-  det = adheight * (bdxcdy - cdxbdy) 
-      + bdheight * (cdxady - adxcdy)
-      + cdheight * (adxbdy - bdxady);
-
-  if (b->noexact) {
-    return det;
-  }
-
-  permanent = (Absolute(bdxcdy) + Absolute(cdxbdy)) * Absolute(adheight)
-            + (Absolute(cdxady) + Absolute(adxcdy)) * Absolute(bdheight)
-            + (Absolute(adxbdy) + Absolute(bdxady)) * Absolute(cdheight);
-  errbound = o3derrboundA * permanent;
-  if ((det > errbound) || (-det > errbound)) {
-    return det;
-  }
-
-  return orient3dadapt(pa, pb, pc, pd, aheight, bheight, cheight, dheight,
-                       permanent);
-}
-
-/*****************************************************************************/
-/*                                                                           */
-/*  nonregular()   Return a positive value if the point pd is incompatible   */
-/*                 with the circle or plane passing through pa, pb, and pc   */
-/*                 (meaning that pd is inside the circle or below the        */
-/*                 plane); a negative value if it is compatible; and zero if */
-/*                 the four points are cocircular/coplanar.  The points pa,  */
-/*                 pb, and pc must be in counterclockwise order, or the sign */
-/*                 of the result will be reversed.                           */
-/*                                                                           */
-/*  If the -w switch is used, the points are lifted onto the parabolic       */
-/*  lifting map, then they are dropped according to their weights, then the  */
-/*  3D orientation test is applied.  If the -W switch is used, the points'   */
-/*  heights are already provided, so the 3D orientation test is applied      */
-/*  directly.  If neither switch is used, the incircle test is applied.      */
-/*                                                                           */
-/*****************************************************************************/
-
-#ifdef ANSI_DECLARATORS
-REAL nonregular(struct mesh *m, struct behavior *b,
-                vertex pa, vertex pb, vertex pc, vertex pd)
-#else /* not ANSI_DECLARATORS */
-REAL nonregular(m, b, pa, pb, pc, pd)
-struct mesh *m;
-struct behavior *b;
-vertex pa;
-vertex pb;
-vertex pc;
-vertex pd;
-#endif /* not ANSI_DECLARATORS */
-
-{
-  if (b->weighted == 0) {
-    return incircle(m, b, pa, pb, pc, pd);
-  } else if (b->weighted == 1) {
-    return orient3d(m, b, pa, pb, pc, pd,
-                    pa[0] * pa[0] + pa[1] * pa[1] - pa[2],
-                    pb[0] * pb[0] + pb[1] * pb[1] - pb[2],
-                    pc[0] * pc[0] + pc[1] * pc[1] - pc[2],
-                    pd[0] * pd[0] + pd[1] * pd[1] - pd[2]);
-  } else {
-    return orient3d(m, b, pa, pb, pc, pd, pa[2], pb[2], pc[2], pd[2]);
-  }
-}
 
 /*****************************************************************************/
 /*                                                                           */
@@ -6575,7 +5967,7 @@ struct mesh *m;
   m->samples = 1;         /* Point location should take at least one sample. */
   m->checksegments = 0;   /* There are no segments in the triangulation yet. */
   m->checkquality = 0;     /* The quality triangulation stage has not begun. */
-  m->incirclecount = m->counterclockcount = m->orient3dcount = 0;
+  m->incirclecount = m->counterclockcount = 0;
   m->circumcentercount = 0;
   randomseed = 1;
 
@@ -6850,21 +6242,20 @@ struct osub *testsubseg;
     sides++;
     /* Find a vertex opposite this subsegment. */
     apex(neighbortri, eapex);
-    /* Check whether the apex is in the diametral lens of the subsegment */
-    /*   (the diametral circle if `conformdel' is set).  A dot product   */
+    /* Check whether the apex is in the diametral lens of the subsegment.*/
+    /*   A dot product                                                   */
     /*   of two sides of the triangle is used to check whether the angle */
     /*   at the apex is greater than (180 - 2 `minangle') degrees (for   */
     /*   lenses; 90 degrees for diametral circles).                      */
     dotproduct = (eorg[0] - eapex[0]) * (edest[0] - eapex[0]) +
                  (eorg[1] - eapex[1]) * (edest[1] - eapex[1]);
     if (dotproduct < 0.0) {
-      if (b->conformdel ||
-          (dotproduct * dotproduct >=
+      if (dotproduct * dotproduct >=
            (2.0 * b->goodangle - 1.0) * (2.0 * b->goodangle - 1.0) *
            ((eorg[0] - eapex[0]) * (eorg[0] - eapex[0]) +
             (eorg[1] - eapex[1]) * (eorg[1] - eapex[1])) *
            ((edest[0] - eapex[0]) * (edest[0] - eapex[0]) +
-            (edest[1] - eapex[1]) * (edest[1] - eapex[1])))) {
+            (edest[1] - eapex[1]) * (edest[1] - eapex[1]))) {
         encroached = 1;
       }
     }
@@ -6877,18 +6268,16 @@ struct osub *testsubseg;
     sides++;
     /* Find the other vertex opposite this subsegment. */
     apex(neighbortri, eapex);
-    /* Check whether the apex is in the diametral lens of the subsegment */
-    /*   (or the diametral circle, if `conformdel' is set).              */
+    /* Check whether the apex is in the diametral lens of the subsegment. */
     dotproduct = (eorg[0] - eapex[0]) * (edest[0] - eapex[0]) +
                  (eorg[1] - eapex[1]) * (edest[1] - eapex[1]);
     if (dotproduct < 0.0) {
-      if (b->conformdel ||
-          (dotproduct * dotproduct >=
+      if (dotproduct * dotproduct >=
            (2.0 * b->goodangle - 1.0) * (2.0 * b->goodangle - 1.0) *
            ((eorg[0] - eapex[0]) * (eorg[0] - eapex[0]) +
             (eorg[1] - eapex[1]) * (eorg[1] - eapex[1])) *
            ((edest[0] - eapex[0]) * (edest[0] - eapex[0]) +
-            (edest[1] - eapex[1]) * (edest[1] - eapex[1])))) {
+            (edest[1] - eapex[1]) * (edest[1] - eapex[1]))) {
         encroached += 2;
       }
     }
@@ -10505,7 +9894,7 @@ vertex endpoint2;
 /*                   intersection of two segments.                           */
 /*                                                                           */
 /*  Returns one if the entire segment is successfully inserted, and zero if  */
-/*  the job must be finished by conformingedge() or constrainededge().       */
+/*  the job must be finished by constrainededge().                            */
 /*                                                                           */
 /*  If the first triangle on the path has the second endpoint as its         */
 /*  destination or apex, a subsegment is inserted and the job is done.       */
@@ -10583,119 +9972,6 @@ int newmark;
   }
 }
 
-/*****************************************************************************/
-/*                                                                           */
-/*  conformingedge()   Force a segment into a conforming Delaunay            */
-/*                     triangulation by inserting a vertex at its midpoint,  */
-/*                     and recursively forcing in the two half-segments if   */
-/*                     necessary.                                            */
-/*                                                                           */
-/*  Generates a sequence of subsegments connecting `endpoint1' to            */
-/*  `endpoint2'.  `newmark' is the boundary marker of the segment, assigned  */
-/*  to each new splitting vertex and subsegment.                             */
-/*                                                                           */
-/*  Note that conformingedge() does not always maintain the conforming       */
-/*  Delaunay property.  Once inserted, segments are locked into place;       */
-/*  vertices inserted later (to force other segments in) may render these    */
-/*  fixed segments non-Delaunay.  The conforming Delaunay property will be   */
-/*  restored by enforcequality() by splitting encroached subsegments.        */
-/*                                                                           */
-/*****************************************************************************/
-
-#ifndef REDUCED
-#ifndef CDT_ONLY
-
-#ifdef ANSI_DECLARATORS
-void conformingedge(struct mesh *m, struct behavior *b,
-                    vertex endpoint1, vertex endpoint2, int newmark)
-#else /* not ANSI_DECLARATORS */
-void conformingedge(m, b, endpoint1, endpoint2, newmark)
-struct mesh *m;
-struct behavior *b;
-vertex endpoint1;
-vertex endpoint2;
-int newmark;
-#endif /* not ANSI_DECLARATORS */
-
-{
-  struct otri searchtri1, searchtri2;
-  struct osub brokensubseg;
-  vertex newvertex;
-  vertex midvertex1, midvertex2;
-  enum insertvertexresult success;
-  int i;
-  subseg sptr;                      /* Temporary variable used by tspivot(). */
-
-  if (b->verbose > 2) {
-    printf("Forcing segment into triangulation by recursive splitting:\n");
-    printf("  (%.12g, %.12g) (%.12g, %.12g)\n", endpoint1[0], endpoint1[1],
-           endpoint2[0], endpoint2[1]);
-  }
-  /* Create a new vertex to insert in the middle of the segment. */
-  newvertex = (vertex) poolalloc(&m->vertices);
-  /* Interpolate coordinates and attributes. */
-  for (i = 0; i < 2 + m->nextras; i++) {
-    newvertex[i] = 0.5 * (endpoint1[i] + endpoint2[i]);
-  }
-  setvertexmark(newvertex, newmark);
-  setvertextype(newvertex, SEGMENTVERTEX);
-  /* No known triangle to search from. */
-  searchtri1.tri = m->dummytri;
-  /* Attempt to insert the new vertex. */
-  success = insertvertex(m, b, newvertex, &searchtri1, (struct osub *) NULL,
-                         0, 0);
-  if (success == DUPLICATEVERTEX) {
-    if (b->verbose > 2) {
-      printf("  Segment intersects existing vertex (%.12g, %.12g).\n",
-             newvertex[0], newvertex[1]);
-    }
-    /* Use the vertex that's already there. */
-    vertexdealloc(m, newvertex);
-    org(searchtri1, newvertex);
-  } else {
-    if (success == VIOLATINGVERTEX) {
-      if (b->verbose > 2) {
-        printf("  Two segments intersect at (%.12g, %.12g).\n",
-               newvertex[0], newvertex[1]);
-      }
-      /* By fluke, we've landed right on another segment.  Split it. */
-      tspivot(searchtri1, brokensubseg);
-      success = insertvertex(m, b, newvertex, &searchtri1, &brokensubseg,
-                             0, 0);
-      if (success != SUCCESSFULVERTEX) {
-        printf("Internal error in conformingedge():\n");
-        printf("  Failure to split a segment.\n");
-        internalerror();
-      }
-    }
-    /* The vertex has been inserted successfully. */
-    if (m->steinerleft > 0) {
-      m->steinerleft--;
-    }
-  }
-  otricopy(searchtri1, searchtri2);
-  /* `searchtri1' and `searchtri2' are fastened at their origins to         */
-  /*   `newvertex', and will be directed toward `endpoint1' and `endpoint2' */
-  /*   respectively.  First, we must get `searchtri2' out of the way so it  */
-  /*   won't be invalidated during the insertion of the first half of the   */
-  /*   segment.                                                             */
-  finddirection(m, b, &searchtri2, endpoint2);
-  if (!scoutsegment(m, b, &searchtri1, endpoint1, newmark)) {
-    /* The origin of searchtri1 may have changed if a collision with an */
-    /*   intervening vertex on the segment occurred.                    */
-    org(searchtri1, midvertex1);
-    conformingedge(m, b, midvertex1, endpoint1, newmark);
-  }
-  if (!scoutsegment(m, b, &searchtri2, endpoint2, newmark)) {
-    /* The origin of searchtri2 may have changed if a collision with an */
-    /*   intervening vertex on the segment occurred.                    */
-    org(searchtri2, midvertex2);
-    conformingedge(m, b, midvertex2, endpoint2, newmark);
-  }
-}
-
-#endif /* not CDT_ONLY */
-#endif /* not REDUCED */
 
 /*****************************************************************************/
 /*                                                                           */
@@ -11046,21 +10322,8 @@ int newmark;
   /*   vertex on the segment occurred.                                       */
   org(searchtri2, endpoint2);
 
-#ifndef REDUCED
-#ifndef CDT_ONLY
-  if (b->splitseg) {
-    /* Insert vertices to force the segment into the triangulation. */
-    conformingedge(m, b, endpoint1, endpoint2, newmark);
-  } else {
-#endif /* not CDT_ONLY */
-#endif /* not REDUCED */
-    /* Insert the segment directly into the triangulation. */
-    constrainededge(m, b, &searchtri1, endpoint2, newmark);
-#ifndef REDUCED
-#ifndef CDT_ONLY
-  }
-#endif /* not CDT_ONLY */
-#endif /* not REDUCED */
+  /* Insert the segment directly into the triangulation. */
+  constrainededge(m, b, &searchtri1, endpoint2, newmark);
 }
 
 /*****************************************************************************/
@@ -12012,7 +11275,7 @@ int triflaws;
         /* If we're using Chew's algorithm (rather than Ruppert's) */
         /*   to define encroachment, delete free vertices from the */
         /*   subsegment's diametral circle.                        */
-        if (!b->conformdel && !acuteorg && !acutedest) {
+        if (!acuteorg && !acutedest) {
           apex(enctri, eapex);
           while ((vertextype(eapex) == FREEVERTEX) &&
                  ((eorg[0] - eapex[0]) * (edest[0] - eapex[0]) +
@@ -12040,7 +11303,7 @@ int triflaws;
           acuteorg = acuteorg || acuteorg2;
 
           /* Delete free vertices from the subsegment's diametral circle. */
-          if (!b->conformdel && !acuteorg2 && !acutedest2) {
+          if (!acuteorg2 && !acutedest2) {
             org(testtri, eapex);
             while ((vertextype(eapex) == FREEVERTEX) &&
                    ((eorg[0] - eapex[0]) * (edest[0] - eapex[0]) +
@@ -12385,25 +11648,6 @@ struct behavior *b;
       }
     }
   }
-  /* At this point, if the "-D" switch was selected and we haven't run out  */
-  /*   of Steiner points, the triangulation should be (conforming) Delaunay */
-  /*   and have no low-quality triangles.                                   */
-
-  /* Might we have run out of Steiner points too soon? */
-  if (!b->quiet && b->conformdel && (m->badsubsegs.items > 0) &&
-      (m->steinerleft == 0)) {
-    printf("\nWarning:  I ran out of Steiner points, but the mesh has\n");
-    if (m->badsubsegs.items == 1) {
-      printf("  one encroached subsegment, and therefore might not be truly\n"
-             );
-    } else {
-      printf("  %ld encroached subsegments, and therefore might not be truly\n"
-             , m->badsubsegs.items);
-    }
-    printf("  Delaunay.  If the Delaunay property is important to you,\n");
-    printf("  try increasing the number of Steiner points (controlled by\n");
-    printf("  the -S switch) slightly and try again.\n\n");
-  }
 }
 
 #endif /* not CDT_ONLY */
@@ -12412,87 +11656,6 @@ struct behavior *b;
 /**                                                                         **/
 /********* Mesh quality maintenance ends here                        *********/
 
-/*****************************************************************************/
-/*                                                                           */
-/*  highorder()   Create extra nodes for quadratic subparametric elements.   */
-/*                                                                           */
-/*****************************************************************************/
-
-#ifdef ANSI_DECLARATORS
-void highorder(struct mesh *m, struct behavior *b)
-#else /* not ANSI_DECLARATORS */
-void highorder(m, b)
-struct mesh *m;
-struct behavior *b;
-#endif /* not ANSI_DECLARATORS */
-
-{
-  struct otri triangleloop, trisym;
-  struct osub checkmark;
-  vertex newvertex;
-  vertex torg, tdest;
-  int i;
-  triangle ptr;                         /* Temporary variable used by sym(). */
-  subseg sptr;                      /* Temporary variable used by tspivot(). */
-
-  if (!b->quiet) {
-    printf("Adding vertices for second-order triangles.\n");
-  }
-  /* The following line ensures that dead items in the pool of nodes    */
-  /*   cannot be allocated for the extra nodes associated with high     */
-  /*   order elements.  This ensures that the primary nodes (at the     */
-  /*   corners of elements) will occur earlier in the output files, and */
-  /*   have lower indices, than the extra nodes.                        */
-  m->vertices.deaditemstack = (VOID *) NULL;
-
-  traversalinit(&m->triangles);
-  triangleloop.tri = triangletraverse(m);
-  /* To loop over the set of edges, loop over all triangles, and look at   */
-  /*   the three edges of each triangle.  If there isn't another triangle  */
-  /*   adjacent to the edge, operate on the edge.  If there is another     */
-  /*   adjacent triangle, operate on the edge only if the current triangle */
-  /*   has a smaller pointer than its neighbor.  This way, each edge is    */
-  /*   considered only once.                                               */
-  while (triangleloop.tri != (triangle *) NULL) {
-    for (triangleloop.orient = 0; triangleloop.orient < 3;
-         triangleloop.orient++) {
-      sym(triangleloop, trisym);
-      if ((triangleloop.tri < trisym.tri) || (trisym.tri == m->dummytri)) {
-        org(triangleloop, torg);
-        dest(triangleloop, tdest);
-        /* Create a new node in the middle of the edge.  Interpolate */
-        /*   its attributes.                                         */
-        newvertex = (vertex) poolalloc(&m->vertices);
-        for (i = 0; i < 2 + m->nextras; i++) {
-          newvertex[i] = 0.5 * (torg[i] + tdest[i]);
-        }
-        /* Set the new node's marker to zero or one, depending on */
-        /*   whether it lies on a boundary.                       */
-        setvertexmark(newvertex, trisym.tri == m->dummytri);
-        setvertextype(newvertex,
-                      trisym.tri == m->dummytri ? FREEVERTEX : SEGMENTVERTEX);
-        if (b->usesegments) {
-          tspivot(triangleloop, checkmark);
-          /* If this edge is a segment, transfer the marker to the new node. */
-          if (checkmark.ss != m->dummysub) {
-            setvertexmark(newvertex, mark(checkmark));
-            setvertextype(newvertex, SEGMENTVERTEX);
-          }
-        }
-        if (b->verbose > 1) {
-          printf("  Creating (%.12g, %.12g).\n", newvertex[0], newvertex[1]);
-        }
-        /* Record the new node in the (one or two) adjacent elements. */
-        triangleloop.tri[m->highorderindex + triangleloop.orient] =
-                (triangle) newvertex;
-        if (trisym.tri != m->dummytri) {
-          trisym.tri[m->highorderindex + trisym.orient] = (triangle) newvertex;
-        }
-      }
-    }
-    triangleloop.tri = triangletraverse(m);
-  }
-}
 
 /********* File I/O routines begin here                              *********/
 /**                                                                         **/
@@ -12708,10 +11871,6 @@ FILE **polyfile;
     printf("Error:  Triangle only works with two-dimensional meshes.\n");
     triexit(1);
   }
-  if (m->nextras == 0) {
-    b->weighted = 0;
-  }
-
   initializevertexpool(m, b);
 
   /* Read the vertices. */
@@ -12819,10 +11978,6 @@ int numberofpointattribs;
     printf("Error:  Input must have at least three input vertices.\n");
     triexit(1);
   }
-  if (m->nextras == 0) {
-    b->weighted = 0;
-  }
-
   initializevertexpool(m, b);
 
   /* Read the vertices. */
@@ -13233,7 +12388,6 @@ char **argv;
 #endif /* not TRILIBRARY */
   struct otri triangleloop;
   vertex p1, p2, p3;
-  vertex mid1, mid2, mid3;
   long elementnumber;
   int i;
 
@@ -13243,9 +12397,8 @@ char **argv;
   }
   /* Allocate memory for output triangles if necessary. */
   if (*trianglelist == (int *) NULL) {
-    *trianglelist = (int *) trimalloc((int) (m->triangles.items *
-                                             ((b->order + 1) * (b->order + 2) /
-                                              2) * sizeof(int)));
+    *trianglelist = (int *) trimalloc((int) (m->triangles.items * 3 *
+                                             sizeof(int)));
   }
   /* Allocate memory for output triangle attributes if necessary. */
   if ((m->eextras > 0) && (*triangleattriblist == (REAL *) NULL)) {
@@ -13267,8 +12420,7 @@ char **argv;
     triexit(1);
   }
   /* Number of triangles, vertices per triangle, attributes per triangle. */
-  fprintf(outfile, "%ld  %d  %d\n", m->triangles.items,
-          (b->order + 1) * (b->order + 2) / 2, m->eextras);
+  fprintf(outfile, "%ld  3  %d\n", m->triangles.items, m->eextras);
 #endif /* not TRILIBRARY */
 
   traversalinit(&m->triangles);
@@ -13279,34 +12431,15 @@ char **argv;
     org(triangleloop, p1);
     dest(triangleloop, p2);
     apex(triangleloop, p3);
-    if (b->order == 1) {
 #ifdef TRILIBRARY
-      tlist[vertexindex++] = vertexmark(p1);
-      tlist[vertexindex++] = vertexmark(p2);
-      tlist[vertexindex++] = vertexmark(p3);
+    tlist[vertexindex++] = vertexmark(p1);
+    tlist[vertexindex++] = vertexmark(p2);
+    tlist[vertexindex++] = vertexmark(p3);
 #else /* not TRILIBRARY */
-      /* Triangle number, indices for three vertices. */
-      fprintf(outfile, "%4ld    %4d  %4d  %4d", elementnumber,
-              vertexmark(p1), vertexmark(p2), vertexmark(p3));
+    /* Triangle number, indices for three vertices. */
+    fprintf(outfile, "%4ld    %4d  %4d  %4d", elementnumber,
+            vertexmark(p1), vertexmark(p2), vertexmark(p3));
 #endif /* not TRILIBRARY */
-    } else {
-      mid1 = (vertex) triangleloop.tri[m->highorderindex + 1];
-      mid2 = (vertex) triangleloop.tri[m->highorderindex + 2];
-      mid3 = (vertex) triangleloop.tri[m->highorderindex];
-#ifdef TRILIBRARY
-      tlist[vertexindex++] = vertexmark(p1);
-      tlist[vertexindex++] = vertexmark(p2);
-      tlist[vertexindex++] = vertexmark(p3);
-      tlist[vertexindex++] = vertexmark(mid1);
-      tlist[vertexindex++] = vertexmark(mid2);
-      tlist[vertexindex++] = vertexmark(mid3);
-#else /* not TRILIBRARY */
-      /* Triangle number, indices for six vertices. */
-      fprintf(outfile, "%4ld    %4d  %4d  %4d  %4d  %4d  %4d", elementnumber,
-              vertexmark(p1), vertexmark(p2), vertexmark(p3), vertexmark(mid1),
-              vertexmark(mid2), vertexmark(mid3));
-#endif /* not TRILIBRARY */
-    }
 
 #ifdef TRILIBRARY
     for (i = 0; i < m->eextras; i++) {
@@ -14012,9 +13145,6 @@ char **argv;
   /* Calculate the number of edges. */
   m.edges = (3l * m.triangles.items + m.hullsize) / 2l;
 
-  if (b.order > 1) {
-    highorder(&m, &b);       /* Promote elements to higher polynomial order. */
-  }
   if (!b.quiet) {
     printf("\n");
   }
@@ -14027,7 +13157,7 @@ char **argv;
   }
   out->numberofpointattributes = m.nextras;
   out->numberoftriangles = m.triangles.items;
-  out->numberofcorners = (b.order + 1) * (b.order + 2) / 2;
+  out->numberofcorners = 3;
   out->numberoftriangleattributes = m.eextras;
   out->numberofedges = m.edges;
   if (b.usesegments) {
