@@ -11,6 +11,42 @@ Created as part of the Quake project (tools for earthquake simulation).
 Supported in part by NSF Grant CMS-9318163 and an NSERC 1967 Scholarship.
 There is no warranty whatsoever.  Use at your own risk.
 
+------------------------------------------------------------------------------
+
+MODIFICATION NOTICE (this is not the original distribution)
+
+This copy of Triangle has been modified and substantially reduced from
+Jonathan Shewchuk's Version 1.6 distribution.  It is now a LIBRARY-ONLY
+source: the command-line program (main), all file-based I/O (.node, .ele,
+.poly, .area, and .off readers and writers), and the usage/help text have
+been removed.  Only the in-memory triangulate() API declared in triangle.h
+remains.
+
+The following features were also removed because they are unused by the
+project this reduction targets:
+  - Voronoi diagram output (-v);
+  - the sweepline and incremental Delaunay algorithms (-F, -i); the
+    divide-and-conquer algorithm is retained;
+  - reconstruction/refinement of an existing mesh (-r);
+  - weighted/regular triangulation (-w), conforming Delaunay (-D),
+    higher-order elements (-o2), the user-defined triangle test (-u), and
+    the mesh statistics and consistency-check reporting (-V, -C).
+
+The robust geometric predicates and the constrained quality-meshing core
+(PSLG input, segments, holes, regions, region attributes, area constraints,
+neighbour output) are retained and unchanged in behaviour.  A golden-output
+test corpus (see the test/ directory) verifies that the reduced source
+produces byte-identical meshes for the retained feature set.
+
+Build and test instructions for this reduced source are in README-WINDOWS.md.
+The original sample input A.poly and example program tricall.c have been
+removed, as they exercised the now-absent command-line and file-I/O paths.
+
+Sections of the original README below that describe the command-line program,
+its switches, and the file formats no longer apply.
+
+------------------------------------------------------------------------------
+
 
 Triangle generates exact Delaunay triangulations, constrained Delaunay
 triangulations, conforming Delaunay triangulations, Voronoi diagrams, and
