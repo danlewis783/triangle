@@ -703,7 +703,6 @@ struct behavior {
 /*   vararea: -a switch without number.                                      */
 /*   fixedarea: -a switch with number.                                       */
 /*     maxarea: maximum area bound, specified after -a switch.               */
-/*   usertest: -u switch.                                                    */
 /*   regionattrib: -A switch.  convex: -c switch.                            */
 /*   jettison: -j switch.                                                    */
 /*   firstnumber: inverse of -z switch.  All items are numbered starting     */
@@ -724,7 +723,7 @@ struct behavior {
 /*                                                                           */
 /* Read the instructions to find out the meaning of these switches.          */
 
-  int poly, quality, vararea, fixedarea, usertest;
+  int poly, quality, vararea, fixedarea;
   int regionattrib, convex, jettison;
   int firstnumber;
   int edgesout, voronoi, neighbors, geomview;
@@ -1269,81 +1268,6 @@ int minus1mod3[3] = {2, 0, 1};
 /**                                                                         **/
 /********* Mesh manipulation primitives end here                     *********/
 
-/********* User-defined triangle evaluation routine begins here      *********/
-/**                                                                         **/
-/**                                                                         **/
-
-/*****************************************************************************/
-/*                                                                           */
-/*  triunsuitable()   Determine if a triangle is unsuitable, and thus must   */
-/*                    be further refined.                                    */
-/*                                                                           */
-/*  You may write your own procedure that decides whether or not a selected  */
-/*  triangle is too big (and needs to be refined).  There are two ways to do */
-/*  this.                                                                    */
-/*                                                                           */
-/*  (1)  Modify the procedure `triunsuitable' below, then recompile          */
-/*  Triangle.                                                                */
-/*                                                                           */
-/*  (2)  Define the symbol EXTERNAL_TEST (either by adding the definition    */
-/*  to this file, or by using the appropriate compiler switch).  This way,   */
-/*  you can compile triangle.c separately from your test.  Write your own    */
-/*  `triunsuitable' procedure in a separate C file (using the same prototype */
-/*  as below).  Compile it and link the object code with triangle.o.         */
-/*                                                                           */
-/*  This procedure returns 1 if the triangle is too large and should be      */
-/*  refined; 0 otherwise.                                                    */
-/*                                                                           */
-/*****************************************************************************/
-
-#ifdef EXTERNAL_TEST
-
-int triunsuitable();
-
-#else /* not EXTERNAL_TEST */
-
-#ifdef ANSI_DECLARATORS
-int triunsuitable(vertex triorg, vertex tridest, vertex triapex, REAL area)
-#else /* not ANSI_DECLARATORS */
-int triunsuitable(triorg, tridest, triapex, area)
-vertex triorg;                              /* The triangle's origin vertex. */
-vertex tridest;                        /* The triangle's destination vertex. */
-vertex triapex;                               /* The triangle's apex vertex. */
-REAL area;                                      /* The area of the triangle. */
-#endif /* not ANSI_DECLARATORS */
-
-{
-  REAL dxoa, dxda, dxod;
-  REAL dyoa, dyda, dyod;
-  REAL oalen, dalen, odlen;
-  REAL maxlen;
-
-  dxoa = triorg[0] - triapex[0];
-  dyoa = triorg[1] - triapex[1];
-  dxda = tridest[0] - triapex[0];
-  dyda = tridest[1] - triapex[1];
-  dxod = triorg[0] - tridest[0];
-  dyod = triorg[1] - tridest[1];
-  /* Find the squares of the lengths of the triangle's three edges. */
-  oalen = dxoa * dxoa + dyoa * dyoa;
-  dalen = dxda * dxda + dyda * dyda;
-  odlen = dxod * dxod + dyod * dyod;
-  /* Find the square of the length of the longest edge. */
-  maxlen = (dalen > oalen) ? dalen : oalen;
-  maxlen = (odlen > maxlen) ? odlen : maxlen;
-
-  if (maxlen > 0.05 * (triorg[0] * triorg[0] + triorg[1] * triorg[1]) + 0.02) {
-    return 1;
-  } else {
-    return 0;
-  }
-}
-
-#endif /* not EXTERNAL_TEST */
-
-/**                                                                         **/
-/**                                                                         **/
-/********* User-defined triangle evaluation routine ends here        *********/
 
 /********* Memory allocation and program exit wrappers begin here    *********/
 /**                                                                         **/
@@ -1426,7 +1350,6 @@ void syntax()
   printf(
     "    -q  Quality mesh generation.  A minimum angle may be specified.\n");
   printf("    -a  Applies a maximum triangle area constraint.\n");
-  printf("    -u  Applies a user-defined triangle constraint.\n");
 #endif /* not CDT_ONLY */
   printf(
     "    -A  Applies attributes to identify triangles in certain regions.\n");
@@ -3219,7 +3142,7 @@ struct behavior *b;
   char workstring[FILENAMESIZE];
 
   b->poly = b->quality = 0;
-  b->vararea = b->fixedarea = b->usertest = 0;
+  b->vararea = b->fixedarea = 0;
   b->regionattrib = b->convex = b->jettison = 0;
   b->firstnumber = 1;
   b->edgesout = b->voronoi = b->neighbors = b->geomview = 0;
@@ -3285,10 +3208,6 @@ struct behavior *b;
             b->vararea = 1;
 	  }
 	}
-        if (argv[i][j] == 'u') {
-          b->quality = 1;
-          b->usertest = 1;
-        }
 #endif /* not CDT_ONLY */
         if (argv[i][j] == 'A') {
           b->regionattrib = 1;
@@ -4484,7 +4403,7 @@ struct behavior *b;
 #ifndef CDT_ONLY
   if (b->quality) {
     pooldeinit(&m->badsubsegs);
-    if ((b->minangle > 0.0) || b->vararea || b->fixedarea || b->usertest) {
+    if ((b->minangle > 0.0) || b->vararea || b->fixedarea) {
       pooldeinit(&m->badtriangles);
       pooldeinit(&m->flipstackers);
     }
@@ -6369,7 +6288,7 @@ struct otri *testtri;
     lprev(*testtri, tri1);
   }
 
-  if (b->vararea || b->fixedarea || b->usertest) {
+  if (b->vararea || b->fixedarea) {
     /* Check whether the area is larger than permitted. */
     area = 0.5 * (dxod * dyda - dyod * dxda);
     if (b->fixedarea && (area > b->maxarea)) {
@@ -6386,13 +6305,6 @@ struct otri *testtri;
       return;
     }
 
-    if (b->usertest) {
-      /* Check whether the user thinks this triangle is too large. */
-      if (triunsuitable(torg, tdest, tapex, area)) {
-        enqueuebadtri(m, b, testtri, minedge, tapex, torg, tdest);
-        return;
-      }
-    }
   }
 
   /* Check whether the angle is smaller than permitted. */
@@ -11086,7 +10998,7 @@ struct behavior *b;
   /*   triangulation should be (conforming) Delaunay.            */
 
   /* Next, we worry about enforcing triangle quality. */
-  if ((b->minangle > 0.0) || b->vararea || b->fixedarea || b->usertest) {
+  if ((b->minangle > 0.0) || b->vararea || b->fixedarea) {
     /* Initialize the pool of bad triangles. */
     poolinit(&m->badtriangles, sizeof(struct badtriang), BADTRIPERBLOCK,
              BADTRIPERBLOCK, 0);
