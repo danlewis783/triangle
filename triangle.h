@@ -279,11 +279,10 @@ struct triangulateio {
   int numberofedges;                                             /* Out only */
 };
 
-#ifdef ANSI_DECLARATORS
+#ifndef VOID
+#define VOID int          /* historical pseudo-void type; matches triangle.c */
+#endif /* not VOID */
+
 void triangulate(char *, struct triangulateio *, struct triangulateio *,
                  struct triangulateio *);
 void trifree(VOID *memptr);
-#else /* not ANSI_DECLARATORS */
-void triangulate();
-void trifree();
-#endif /* not ANSI_DECLARATORS */
