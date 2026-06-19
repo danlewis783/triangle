@@ -42,7 +42,7 @@ $pd        = Join-Path $work 'combined.profdata'
 
 Write-Host 'Instrumenting triangle.c (-O0, coverage)...' -ForegroundColor Cyan
 & $clang -O0 -g -fprofile-instr-generate -fcoverage-mapping `
-    -DTRILIBRARY -DCPU86 -DNO_TIMER -I. `
+    -DCPU86 -DNO_TIMER -I. `
     -o $goldenExe triangle.c test\golden_runner.c -lm
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Instrumented golden build failed ($LASTEXITCODE)."
@@ -50,7 +50,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 & $clang -O0 -g -fprofile-instr-generate -fcoverage-mapping `
-    -DTRILIBRARY -DCPU86 -DNO_TIMER -I. -Itest\unity `
+    -DCPU86 -DNO_TIMER -I. -Itest\unity `
     -o $unitExe triangle.c test\unity\unity.c test\test_triangle.c -lm
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Instrumented Unity build failed ($LASTEXITCODE)."

@@ -1,10 +1,6 @@
 # makefile for Triangle
 #
-# Type "make" to compile Triangle.
-#
-# After compiling, type "triangle -h" to read instructions for using.
-#
-# Type "make trilibrary" to compile Triangle as an object file (triangle.o).
+# Type "make" to compile Triangle as a library object.
 #
 # Type "make distclean" to delete all object and executable files.
 
@@ -49,19 +45,6 @@ CC = cc
 #   slowly, however, so be sure to remove this switch before compiling a
 #   production version.
 #
-# If the size of the Triangle binary is important to you, you may wish to
-#   generate a reduced version of Triangle.  The -DREDUCED switch gets rid
-#   of all features that are primarily of research interest.  Specifically,
-#   defining the REDUCED symbol eliminates the -i, -F, -s, and -C switches.
-#   The -DCDT_ONLY switch gets rid of all meshing algorithms above and beyond
-#   constrained Delaunay triangulation.  Specifically, defining the CDT_ONLY
-#   symbol eliminates the -r, -q, -a, -u, -D, -S, and -s switches.  The
-#   REDUCED and CDT_ONLY symbols may be particularly attractive when Triangle
-#   is called by another program that does not need all of Triangle's
-#   features; in this case, these switches should appear as part of
-#   "TRILIBDEFS" below.
-#
-#
 # An example CSWITCHES line is:
 #
 #   CSWITCHES = -O -DNO_TIMER -DLINUX
@@ -70,19 +53,6 @@ CC = cc
 #   -DCPU86    enables the correct x86 FPU control word for robust arithmetic
 #   -DNO_TIMER drops the Unix-only <sys/time.h> timing code
 CSWITCHES = -O -DCPU86 -DNO_TIMER
-
-# TRILIBDEFS is a list of definitions used to compile an object code version
-#   of Triangle (triangle.o) to be called by another program.  The file
-#   "triangle.h" contains detailed information on how to call triangle.o.
-#
-# The -DTRILIBRARY should always be used when compiling Triangle into an
-#   object file.
-#
-# An example TRILIBDEFS line is:
-#
-#   TRILIBDEFS = -DTRILIBRARY -DREDUCED -DCDT_ONLY
-
-TRILIBDEFS = -DTRILIBRARY
 
 # RM should be set to the name of your favorite rm (file deletion program).
 
@@ -93,29 +63,23 @@ RM = /bin/rm
 # `test' shares its name with the test/ directory, so mark targets phony.
 .PHONY: all trilibrary test distclean
 
-all: $(BIN)triangle
+all: $(BIN)triangle.o
 
-trilibrary: $(BIN)triangle.o $(BIN)tricall
-
-$(BIN)triangle: $(SRC)triangle.c
-	$(CC) $(CSWITCHES) -o $(BIN)triangle $(SRC)triangle.c -lm
-
-$(BIN)tricall: $(BIN)tricall.c $(BIN)triangle.o
-	$(CC) $(CSWITCHES) -o $(BIN)tricall $(SRC)tricall.c \
-		$(BIN)triangle.o -lm
+trilibrary: all
 
 $(BIN)triangle.o: $(SRC)triangle.c $(SRC)triangle.h
-	$(CC) $(CSWITCHES) $(TRILIBDEFS) -c -o $(BIN)triangle.o \
+	$(CC) $(CSWITCHES) -c -o $(BIN)triangle.o \
 		$(SRC)triangle.c
 
 # Build and run the Unity test suite (see test/test_triangle.c).  This recipe
 # assumes a Unix-style shell; on a plain Windows/PowerShell prompt run
 # "pwsh -File test/run-tests.ps1" instead.
 test: $(SRC)triangle.c $(SRC)triangle.h test/test_triangle.c test/unity/unity.c
-	$(CC) $(CSWITCHES) -DTRILIBRARY -I. -Itest/unity \
+	$(CC) $(CSWITCHES) -I. -Itest/unity \
 		-o test/test_triangle $(SRC)triangle.c \
 		test/unity/unity.c test/test_triangle.c -lm
 	./test/test_triangle
 
 distclean:
-	$(RM) $(BIN)triangle $(BIN)triangle.o $(BIN)tricall test/test_triangle
+	$(RM) $(BIN)triangle.o \
+		test/test_triangle test/test_triangle.exe

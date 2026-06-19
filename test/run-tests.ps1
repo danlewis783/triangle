@@ -28,7 +28,7 @@ if (-not (Test-Path $clang)) {
     Write-Error "clang not found. Install LLVM-MinGW (see README-WINDOWS.md)."
 }
 
-$cflags  = @('-O2', '-DTRILIBRARY', '-DCPU86', '-DNO_TIMER', '-I.', '-Itest\unity')
+$cflags  = @('-O2', '-DCPU86', '-DNO_TIMER', '-I.', '-Itest\unity')
 $failed  = $false
 
 function Invoke-Clang {

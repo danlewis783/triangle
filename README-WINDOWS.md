@@ -1,6 +1,7 @@
 # Building Triangle on 64-bit Windows
 
-This note describes how to build Triangle on Windows 11 (64-bit Intel/AMD)
+This note describes how to build the Triangle library on Windows 11
+(64-bit Intel/AMD)
 using only freely available software. The upstream `README` and `makefile`
 target Unix; this file covers the Windows specifics.
 
@@ -51,20 +52,13 @@ From the project directory (`C:\dev\triangle`) in a PowerShell prompt:
 mingw32-make
 ```
 
-This produces `triangle.exe`. (LLVM-MinGW ships `mingw32-make.exe`, and its
-Clang front end is also available as `cc`, which the makefile invokes.)
+This produces `triangle.o`. LLVM-MinGW ships `mingw32-make.exe`, and its
+Clang front end is also available as `cc`, which the makefile invokes.
 
 ### Option B — invoke Clang directly
 
 ```powershell
-clang -O2 -DCPU86 -DNO_TIMER -o triangle.exe triangle.c -lm
-```
-
-To also build the callable library object and the sample driver:
-
-```powershell
-clang -O2 -DTRILIBRARY -DCPU86 -DNO_TIMER -c -o triangle.o triangle.c
-clang -O2 -DCPU86 -DNO_TIMER -o tricall.exe tricall.c triangle.o -lm
+clang -O2 -DCPU86 -DNO_TIMER -c -o triangle.o triangle.c
 ```
 
 The compile prints some deprecation and `%lx`-format warnings from the
@@ -72,21 +66,17 @@ The compile prints some deprecation and `%lx`-format warnings from the
 
 ## Verify the build
 
-Run the bundled sample input:
+Run the maintained behavioral tests:
 
 ```powershell
-.\triangle.exe A.poly
+pwsh -File test\run-tests.ps1
 ```
 
-This should exit cleanly and write `A.1.node`, `A.1.ele`, and `A.1.poly`.
-A quick test of the quality-meshing / refinement path:
-
-```powershell
-.\triangle.exe -pq30a5 A.poly
-```
-
-It should add Steiner points and report a larger mesh (≈76 vertices) with
-exit code 0.
+They exercise `triangulate()` through the in-memory `triangulateio` API and
+compare representative meshes byte-for-byte with known-good baselines. The
+standalone file-based CLI has intentionally been removed from this reduced
+source; `triangle.c` is now library-only. The upstream `tricall.c` remains as
+historical API reference, but its demo flow uses removed `-v` and `-r` modes.
 
 ## Tests
 
@@ -98,8 +88,8 @@ through its public `triangulate()` library API (the same entry point
 pwsh -File test\run-tests.ps1
 ```
 
-It compiles `triangle.c` (with `-DTRILIBRARY`) against the tests and exits
-non-zero if anything fails.
+It compiles the library against the tests and exits non-zero if anything
+fails.
 
 ### Layer 1 — Unity unit tests
 
