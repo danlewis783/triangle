@@ -8,6 +8,7 @@ test/test_triangle
 test/test_triangle.exe
 test/golden_runner.exe
 test/predicate_oracle.exe
+test/phase_runner.exe
 test/contract_validator.exe
 test/.golden-actual/
 test/.coverage/
