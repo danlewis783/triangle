@@ -136,7 +136,9 @@ else {
 Write-Host ''
 Write-Host '== Contract validators ==' -ForegroundColor Cyan
 $contractExe = 'test\contract_validator.exe'
-Invoke-Clang $contractExe (@('-o', $contractExe, 'triangle.c',
+# contract_validator.c #includes triangle.c (white-box), so triangle.c is not
+# listed separately here.
+Invoke-Clang $contractExe (@('-o', $contractExe,
                 'test\contract_validator.c', 'test\scenarios.c', '-lm') + $cflags)
 & ".\$contractExe"
 if ($LASTEXITCODE -ne 0) { $failed = $true }
