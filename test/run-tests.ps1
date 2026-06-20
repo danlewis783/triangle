@@ -15,6 +15,9 @@
 #     geometric predicates over near-degenerate inputs; the cross-language
 #     contract for a future port. Its predicates.txt is compared like the
 #     corpus baselines.
+#   * Contract validators (contract_validator.c) - structural invariants
+#     (topology, neighbour-slot semantics) the output must satisfy; the
+#     contract-equivalence bar a reimplementation must meet.
 
 [CmdletBinding()]
 param([switch]$Update)
@@ -61,7 +64,8 @@ if ($LASTEXITCODE -ne 0) { $failed = $true }
 Write-Host ''
 Write-Host '== Golden corpus ==' -ForegroundColor Cyan
 $goldenExe = 'test\golden_runner.exe'
-Invoke-Clang $goldenExe (@('-o', $goldenExe, 'triangle.c', 'test\golden_runner.c', '-lm') + $cflags)
+Invoke-Clang $goldenExe (@('-o', $goldenExe, 'triangle.c', 'test\golden_runner.c',
+                'test\scenarios.c', '-lm') + $cflags)
 
 $goldenDir = 'test\golden'
 $actualDir = 'test\.golden-actual'
@@ -122,6 +126,20 @@ else {
         }
     }
 }
+
+# --- 3. Contract validators ---------------------------------------------- #
+
+# Structural-invariant checks (topological validity, neighbour-slot semantics)
+# run against Triangle's output for the shared scenarios. This is the
+# contract-equivalence bar a reimplementation must meet - it does not bless
+# anything, it just passes or fails.
+Write-Host ''
+Write-Host '== Contract validators ==' -ForegroundColor Cyan
+$contractExe = 'test\contract_validator.exe'
+Invoke-Clang $contractExe (@('-o', $contractExe, 'triangle.c',
+                'test\contract_validator.c', 'test\scenarios.c', '-lm') + $cflags)
+& ".\$contractExe"
+if ($LASTEXITCODE -ne 0) { $failed = $true }
 
 Write-Host ''
 if ($failed) { Write-Host 'FAILED' -ForegroundColor Red; exit 1 }

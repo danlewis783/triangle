@@ -43,7 +43,7 @@ $pd        = Join-Path $work 'combined.profdata'
 Write-Host 'Instrumenting triangle.c (-O0, coverage)...' -ForegroundColor Cyan
 & $clang -O0 -g -fprofile-instr-generate -fcoverage-mapping `
     -DCPU86 -DNO_TIMER -I. `
-    -o $goldenExe triangle.c test\golden_runner.c -lm
+    -o $goldenExe triangle.c test\golden_runner.c test\scenarios.c -lm
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Instrumented golden build failed ($LASTEXITCODE)."
     exit 1
