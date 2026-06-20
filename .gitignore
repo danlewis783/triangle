@@ -3,6 +3,7 @@ triangle
 triangle.exe
 tricall
 tricall.exe
+triangle.dll
 test/test_triangle
 test/test_triangle.exe
 test/golden_runner.exe

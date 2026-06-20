@@ -61,7 +61,7 @@ RM = /bin/rm
 # The action starts here.
 
 # `test' shares its name with the test/ directory, so mark targets phony.
-.PHONY: all trilibrary test distclean
+.PHONY: all trilibrary shared test distclean
 
 all: $(BIN)triangle.o
 
@@ -70,6 +70,16 @@ trilibrary: all
 $(BIN)triangle.o: $(SRC)triangle.c $(SRC)triangle.h
 	$(CC) $(CSWITCHES) -c -o $(BIN)triangle.o \
 		$(SRC)triangle.c
+
+# Shared library for foreign-function consumers (e.g. the Java port's JNA
+# adapter).  Produces triangle.dll on Windows; on Unix change the suffix to
+# .so and add -fPIC.  --export-all-symbols makes triangulate() and trifree()
+# callable without annotating the source.
+$(BIN)triangle.dll: $(SRC)triangle.c $(SRC)triangle.h
+	$(CC) $(CSWITCHES) -shared -Wl,--export-all-symbols \
+		-o $(BIN)triangle.dll $(SRC)triangle.c -lm
+
+shared: $(BIN)triangle.dll
 
 # Build and run the Unity test suite (see test/test_triangle.c).  This recipe
 # assumes a Unix-style shell; on a plain Windows/PowerShell prompt run
@@ -81,5 +91,5 @@ test: $(SRC)triangle.c $(SRC)triangle.h test/test_triangle.c test/unity/unity.c
 	./test/test_triangle
 
 distclean:
-	$(RM) $(BIN)triangle.o \
+	$(RM) $(BIN)triangle.o $(BIN)triangle.dll \
 		test/test_triangle test/test_triangle.exe
