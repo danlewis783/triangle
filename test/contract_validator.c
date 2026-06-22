@@ -303,6 +303,95 @@ static int validate_segments(const char *name, struct triangulateio *o,
   return viol;
 }
 
+/* --- 4b. segment coverage (each input segment covered by a chain) -------- */
+
+/* Parameter t of P along segment a+t*(b-a) if P lies on it; returns 0 if not. */
+static int on_segment_param(REAL ax, REAL ay, REAL dx, REAL dy, REAL len2,
+                            REAL px, REAL py, double *t)
+{
+  REAL rx = px - ax, ry = py - ay;
+  REAL cross = dx * ry - dy * rx;
+  REAL tol = 1e-6;
+  REAL tt;
+  if (cross * cross > tol * tol * len2 * len2) {
+    return 0;                                  /* off the line */
+  }
+  tt = (rx * dx + ry * dy) / len2;
+  if (tt < -tol || tt > 1.0 + tol) {
+    return 0;
+  }
+  *t = tt;
+  return 1;
+}
+
+static int covers_unit_interval(double *lo, double *hi, int n)
+{
+  int i, j;
+  double tol = 1e-6, reach = 0.0;
+  if (n == 0) {
+    return 0;
+  }
+  for (i = 1; i < n; i++) {                    /* insertion sort by lo */
+    double kl = lo[i], kh = hi[i];
+    for (j = i - 1; j >= 0 && lo[j] > kl; j--) {
+      lo[j + 1] = lo[j];
+      hi[j + 1] = hi[j];
+    }
+    lo[j + 1] = kl;
+    hi[j + 1] = kh;
+  }
+  if (lo[0] > tol) {
+    return 0;                                  /* gap at the start */
+  }
+  for (i = 0; i < n; i++) {
+    if (lo[i] > reach + tol) {
+      return 0;                                /* gap in the middle */
+    }
+    if (hi[i] > reach) {
+      reach = hi[i];
+    }
+  }
+  return reach >= 1.0 - tol;                    /* reaches the end */
+}
+
+#define MAX_PIECES 1024
+
+static int validate_segment_coverage(const char *name, struct triangulateio *in,
+                                     struct triangulateio *o)
+{
+  int viol = 0, reported = 0, s, i;
+  for (s = 0; s < in->numberofsegments; s++) {
+    int a = in->segmentlist[2 * s], b = in->segmentlist[2 * s + 1];
+    double lo[MAX_PIECES], hi[MAX_PIECES];
+    int n = 0;
+    REAL ax = o->pointlist[2 * a], ay = o->pointlist[2 * a + 1];
+    REAL dx = o->pointlist[2 * b] - ax, dy = o->pointlist[2 * b + 1] - ay;
+    REAL len2 = dx * dx + dy * dy;
+    if (len2 <= 0) {
+      continue;
+    }
+    for (i = 0; i < o->numberofsegments && n < MAX_PIECES; i++) {
+      int u = o->segmentlist[2 * i], w = o->segmentlist[2 * i + 1];
+      double tu, tw;
+      if (on_segment_param(ax, ay, dx, dy, len2,
+                           o->pointlist[2 * u], o->pointlist[2 * u + 1], &tu)
+          && on_segment_param(ax, ay, dx, dy, len2,
+                              o->pointlist[2 * w], o->pointlist[2 * w + 1], &tw)) {
+        lo[n] = tu < tw ? tu : tw;
+        hi[n] = tu < tw ? tw : tu;
+        n++;
+      }
+    }
+    if (!covers_unit_interval(lo, hi, n)) {
+      if (reported++ < MAX_REPORT)
+        printf("      [coverage] %s: input segment (%d,%d) not covered by "
+               "output subsegments\n", name, a, b);
+      viol++;
+    }
+  }
+  return viol;
+}
+
 /* --- 5a. holes (no triangle covers an input hole point) ------------------ */
 
 static int orient_sign(REAL ax, REAL ay, REAL bx, REAL by, REAL px, REAL py)
@@ -457,6 +546,7 @@ int main(void)
     v += validate_neighbors(scenarios[s].name, &out);
     v += validate_delaunay(scenarios[s].name, &out, seg, nseg);
     v += validate_segments(scenarios[s].name, &out, meshedges, nedge);
+    v += validate_segment_coverage(scenarios[s].name, &in, &out);
     v += validate_holes(scenarios[s].name, &in, &out);
     v += validate_regions(scenarios[s].name, &out, seg, nseg);
     v += validate_quality(scenarios[s].name, &out, scenarios[s].flags);
