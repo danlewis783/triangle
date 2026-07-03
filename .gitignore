@@ -4,9 +4,10 @@ triangle.exe
 tricall
 tricall.exe
 
-# Object files
+# Object files and shared libraries
 *.o
 *.obj
+*.dll
 
 # Triangle-generated mesh files (e.g. A.1.node, A.1.ele, A.1.poly).
 # The iteration-number segment distinguishes them from inputs like A.poly.

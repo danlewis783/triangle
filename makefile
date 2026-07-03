@@ -6,6 +6,9 @@
 #
 # Type "make trilibrary" to compile Triangle as an object file (triangle.o).
 #
+# Type "make shared" to compile Triangle as a Windows DLL (triangle.dll)
+#   for callers that load it dynamically (e.g. via JNA).
+#
 # Type "make distclean" to delete all object and executable files.
 
 # SRC is the directory in which the C source files are, and BIN is the
@@ -69,7 +72,7 @@ CC = cc
 # For a 64-bit Windows build with the LLVM-MinGW (clang) toolchain:
 #   -DCPU86    enables the correct x86 FPU control word for robust arithmetic
 #   -DNO_TIMER drops the Unix-only <sys/time.h> timing code
-CSWITCHES = -O -DCPU86 -DNO_TIMER
+CSWITCHES = -O2 -DCPU86 -DNO_TIMER
 
 # TRILIBDEFS is a list of definitions used to compile an object code version
 #   of Triangle (triangle.o) to be called by another program.  The file
@@ -94,6 +97,8 @@ all: $(BIN)triangle
 
 trilibrary: $(BIN)triangle.o $(BIN)tricall
 
+shared: $(BIN)triangle.dll
+
 $(BIN)triangle: $(SRC)triangle.c
 	$(CC) $(CSWITCHES) -o $(BIN)triangle $(SRC)triangle.c -lm
 
@@ -105,5 +110,12 @@ $(BIN)triangle.o: $(SRC)triangle.c $(SRC)triangle.h
 	$(CC) $(CSWITCHES) $(TRILIBDEFS) -c -o $(BIN)triangle.o \
 		$(SRC)triangle.c
 
+# Triangle's source has no __declspec(dllexport) annotations, so
+#   --export-all-symbols is needed to put triangulate() and trifree() in the
+#   DLL export table where dynamic loaders (GetProcAddress, JNA) look.
+$(BIN)triangle.dll: $(SRC)triangle.c $(SRC)triangle.h
+	$(CC) $(CSWITCHES) $(TRILIBDEFS) -shared -Wl,--export-all-symbols \
+		-o $(BIN)triangle.dll $(SRC)triangle.c
+
 distclean:
-	$(RM) $(BIN)triangle $(BIN)triangle.o $(BIN)tricall
+	$(RM) $(BIN)triangle $(BIN)triangle.o $(BIN)tricall $(BIN)triangle.dll

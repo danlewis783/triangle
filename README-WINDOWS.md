@@ -54,6 +54,13 @@ mingw32-make
 This produces `triangle.exe`. (LLVM-MinGW ships `mingw32-make.exe`, and its
 Clang front end is also available as `cc`, which the makefile invokes.)
 
+To build Triangle as a shared library (`triangle.dll`) for dynamic loaders
+such as JNA:
+
+```powershell
+mingw32-make shared
+```
+
 ### Option B — invoke Clang directly
 
 ```powershell
@@ -67,8 +74,40 @@ clang -O2 -DTRILIBRARY -DCPU86 -DNO_TIMER -c -o triangle.o triangle.c
 clang -O2 -DCPU86 -DNO_TIMER -o tricall.exe tricall.c triangle.o -lm
 ```
 
+Or the shared library:
+
+```powershell
+clang -O2 -DTRILIBRARY -DCPU86 -DNO_TIMER -shared "-Wl,--export-all-symbols" -o triangle.dll triangle.c
+```
+
 The compile prints some deprecation and `%lx`-format warnings from the
 2005-era C code; these are harmless and do not affect correctness.
+
+## The DLL for JNA consumers
+
+Upstream Triangle has no notion of a DLL: the author's "library" form is
+`triangle.o` compiled with `-DTRILIBRARY` (see `make trilibrary`), and
+`tricall.c` is merely an example *client* program. The `triangle.dll` name
+used here follows the source/JNA convention (`Native.load("triangle", ...)`);
+the legacy `tricall.dll` name was an artifact of the old SWIG/JNI wrapper,
+not anything the original author intended.
+
+Build notes:
+
+- `-DTRILIBRARY` is required — without it `triangle.c` compiles the
+  standalone `main()` and there is no `triangulate()` to call.
+- `-Wl,--export-all-symbols` is required — the source has no
+  `__declspec(dllexport)` annotations, and JNA resolves `triangulate` and
+  `trifree` through the PE export table.
+- The consuming project loads the DLL from its classpath at
+  `src/main/resources/win32-x86-64/triangle.dll` (e.g.
+  `C:\dev\triangle-java`). Copy the freshly built DLL there after a rebuild.
+
+Verify the exports if in doubt:
+
+```powershell
+llvm-objdump -p triangle.dll | Select-String "triangulate|trifree"
+```
 
 ## Verify the build
 
