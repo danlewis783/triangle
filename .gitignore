@@ -18,3 +18,10 @@ tricall.exe
 *.[0-9]*.area
 *.[0-9]*.v.node
 *.[0-9]*.v.edge
+
+# IntelliJ IDEA
+.idea/
+*.iml
+
+# Claude
+.claude
