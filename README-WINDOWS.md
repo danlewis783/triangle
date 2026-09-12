@@ -22,7 +22,7 @@ required. Use `.build/out/triangle.dll` when copying the DLL to a consumer.
 `bootstrap.ps1` can also run separately. Both scripts accept `-BuildRoot`
 (default `.build`) and `-Offline`. Offline mode requires the pinned archive
 in `<BuildRoot>/downloads/llvm-mingw-20260602.zip`; it still verifies the hash.
-The hash is the same reviewed archive hash pinned by RideStamp, not an
+The hash is the same reviewed archive hash pinned by Triangle, not an
 independent publisher signature. Extraction is cached; use a fresh build root
 if the extracted compiler has been modified.
 
