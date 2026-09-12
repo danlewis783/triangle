@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "target": "x86_64-w64-windows-gnu",
+  "clang": "22.1.7",
+  "sourceDateEpoch": 1751328000,
+  "archive": {
+    "file": "llvm-mingw-20260602.zip",
+    "url": "https://github.com/mstorsjo/llvm-mingw/releases/download/20260602/llvm-mingw-20260602-ucrt-x86_64.zip",
+    "sha256": "3de3eda9377bbaf35f8c9001f190380f63b8ee981fa55d3ae9d7cce7c6ad7c70",
+    "directory": "llvm-mingw-20260602-ucrt-x86_64"
+  }
+}

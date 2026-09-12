@@ -26,3 +26,6 @@ tricall.exe
 
 # Claude
 .claude
+
+# Pinned Windows tools and reproducible build outputs
+.build*/
