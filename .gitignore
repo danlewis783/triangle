@@ -29,3 +29,8 @@ tricall.exe
 
 # Pinned Windows tools and reproducible build outputs
 .build*/
+*.lib
+*.exp
+*.pdb
+*.ilk
+msvc-dll.exe

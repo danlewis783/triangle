@@ -1,0 +1,4 @@
+LIBRARY triangle
+EXPORTS
+    triangulate
+    trifree
